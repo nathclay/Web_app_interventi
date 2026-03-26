@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Web App Interventi</title>
+
+  <!-- Leaflet CSS (for the map) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Our stylesheet -->
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ============================================================
+    WRAPPER — contains the entire dashboard
+  ============================================================ -->
+  <div id="dashboard-wrapper">
+
+    <!-- ============================================================
+      TOP BAR — full width title
+    ============================================================ -->
+    <header id="top-bar">
+      <h1 id="event-title">TITOLO EVENTO</h1>
+    </header>
+
+    <!-- ============================================================
+      ORARI ROW — two clock/time boxes below the title
+    ============================================================ -->
+    <div id="orari-row">
+      <div id="orario-1" class="orario-box">
+        <!-- JS (dashboard.js) will write the start time here -->
+        <span class="orario-label">ORARIO INIZIO</span>
+        <span class="orario-value" id="orario-1-value">--:--</span>
+      </div>
+
+      <!-- spacer aligned with the map column -->
+      <div id="orari-spacer"></div>
+
+      <div id="orario-2" class="orario-box">
+        <!-- JS (dashboard.js) will write the current/end time here -->
+        <span class="orario-label">ORARIO ATTUALE</span>
+        <span class="orario-value" id="orario-2-value">--:--</span>
+      </div>
+    </div>
+
+
+    <!-- ============================================================
+      MAIN BODY — menu strip | left panel | map | right panel
+    ============================================================ -->
+    <div id="main-body">
+
+      <!-- ----------------------------------------------------------
+        MENU STRIP — thin collapsible vertical sidebar (far left)
+      ---------------------------------------------------------- -->
+      <nav id="menu-strip">
+        <!-- Toggle button — JS (dashboard.js) will expand/collapse the strip -->
+        <button id="menu-toggle" title="Apri/Chiudi menu">
+          <span>m</span>
+          <span>e</span>
+          <span>n</span>
+          <span>u</span>
+        </button>
+
+        <!-- Navigation icons — JS will handle routing/filtering -->
+        <ul id="menu-items">
+          <li class="menu-item" id="menu-home" title="Home">⌂</li>
+          <li class="menu-item" id="menu-incidents" title="Interventi">🚑</li>
+          <li class="menu-item" id="menu-resources" title="Risorse">📦</li>
+          <li class="menu-item" id="menu-reports" title="Report">📋</li>
+          <li class="menu-item" id="menu-settings" title="Impostazioni">⚙</li>
+        </ul>
+      </nav>
+
+
+      <!-- ----------------------------------------------------------
+        LEFT PANEL — SOCCORSI (incidents list)
+      ---------------------------------------------------------- -->
+      <aside id="panel-soccorsi">
+        <h2 class="panel-title">SOCCORSI</h2>
+
+        <!-- Active incidents sub-panel -->
+        <div id="soccorsi-attivi" class="soccorsi-subpanel">
+          <h3 class="subpanel-title">Socc. attivi</h3>
+          <!--
+            JS (dashboard.js) will inject incident cards here.
+            Each card will contain: Descr. / Mod. / Orario / colore
+          -->
+          <div id="soccorsi-attivi-list" class="incident-list">
+            <!-- Placeholder — JS will replace these with real data -->
+            <div class="incident-card placeholder">
+              <span class="incident-meta">Descr. / Mod. / Orario / colore</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Closed incidents sub-panel -->
+        <div id="soccorsi-chiusi" class="soccorsi-subpanel">
+          <h3 class="subpanel-title">Socc. chiusi</h3>
+          <!--
+            JS (dashboard.js) will inject closed incident cards here.
+          -->
+          <div id="soccorsi-chiusi-list" class="incident-list">
+            <!-- Placeholder — JS will replace these with real data -->
+            <div class="incident-card placeholder">
+              <span class="incident-meta">Descr. / Mod. / Orario / colore</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+
+      <!-- ----------------------------------------------------------
+        MAP AREA — center column (takes all remaining space)
+      ---------------------------------------------------------- -->
+      <main id="map-container">
+
+        <!-- Map overlay top-left: legend -->
+        <div id="map-legend" class="map-overlay map-overlay-left">
+          <span class="overlay-title">Legenda</span>
+          <!--
+            JS (map.js) will populate legend items dynamically.
+            Each item: coloured dot + label
+          -->
+          <ul id="legend-list">
+            <li class="legend-item placeholder">
+              <span class="legend-dot"></span>
+              <span class="legend-label">—</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Map overlay top-right: layer/attribute toggle buttons -->
+        <div id="map-attr-buttons" class="map-overlay map-overlay-right">
+          <span class="overlay-title">Layer mappa</span>
+          <!--
+            JS (map.js) will wire up these buttons to toggle map layers.
+            Add active class via JS when a layer is on.
+          -->
+          <div id="map-attr-btn-group">
+            <button class="map-attr-btn" id="btn-layer-base">Base</button>
+            <button class="map-attr-btn" id="btn-layer-ambulanze">Ambulanze</button>
+            <button class="map-attr-btn" id="btn-layer-pma">PMA</button>
+            <button class="map-attr-btn" id="btn-layer-interventi">Interventi</button>
+          </div>
+        </div>
+
+        <!-- 
+          THE MAP — Leaflet renders here.
+          map.js will call: L.map('map').setView([...], zoom)
+        -->
+        <div id="map"></div>
+
+        <!-- Bottom action buttons row — below the map -->
+        <div id="map-actions">
+          <!--
+            JS (dashboard.js / map.js) will attach click handlers to each button.
+          -->
+          <button class="map-action-btn" id="btn-pos-recenti">
+            📍 Pos. recenti
+          </button>
+          <button class="map-action-btn" id="btn-mezzi-liberi">
+            🚑 Mezzi liberi
+          </button>
+          <button class="map-action-btn" id="btn-cerca">
+            🔍 Cerca
+          </button>
+          <button class="map-action-btn btn-primary" id="btn-intervento">
+            ➕ Intervento
+          </button>
+        </div>
+
+      </main>
+
+
+      <!-- ----------------------------------------------------------
+        RIGHT PANEL — MODULI (PMA posts + vehicle modules)
+      ---------------------------------------------------------- -->
+      <aside id="panel-moduli">
+        <h2 class="panel-title">MODULI</h2>
+
+        <!-- PMA sub-panel — First Aid Posts -->
+        <div id="pma-subpanel" class="moduli-subpanel">
+          <!--
+            JS (dashboard.js) will inject PMA rows here.
+            Each row: PMA name / liberi / occupati / capienza
+          -->
+          <div id="pma-list">
+            <!-- Placeholders — JS will replace with real data -->
+            <div class="pma-row placeholder">
+              <span class="pma-name">PMA 1</span>
+              <span class="pma-stats">Liberi / occ / capienza</span>
+            </div>
+            <div class="pma-row placeholder">
+              <span class="pma-name">PMA 2</span>
+              <span class="pma-stats">—</span>
+            </div>
+            <div class="pma-row placeholder pma-dots">
+              <span class="pma-name">..</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Moduli sub-panel — vehicle/unit modules -->
+        <div id="moduli-subpanel" class="moduli-subpanel">
+          <h3 class="subpanel-title">Moduli</h3>
+          <!--
+            JS (dashboard.js) will inject module rows here.
+            Each row: Mod. / Ora pos. / Ora int. / conteggio
+          -->
+          <div id="moduli-list">
+            <!-- Placeholder — JS will replace with real data -->
+            <div class="modulo-row placeholder">
+              <span class="modulo-meta">Mod. / Ora pos. / Ora int. / conteggio</span>
+            </div>
+          </div>
+        </div>
+
+      </aside>
+
+    </div><!-- /#main-body -->
+
+  </div><!-- /#dashboard-wrapper -->
+
+
+  <!-- ============================================================
+    SCRIPTS — load order matters!
+    1. supabase.js  → sets up DB connection (must be first)
+    2. map.js       → initialises Leaflet, reads from Supabase
+    3. dashboard.js → fills panels, wires up buttons, starts clock
+  ============================================================ -->
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Supabase JS client (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Our JS files -->
+  <script src="js/supabase.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/dashboard.js"></script>
+
+</body>
+</html>

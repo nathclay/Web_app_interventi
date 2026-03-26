@@ -1,0 +1,585 @@
+/* ================================================================
+   Web App Interventi — style.css
+   Dark control-room theme
+   ================================================================ */
+
+
+/* ----------------------------------------------------------------
+   1. CSS VARIABLES — change colours/sizes here to retheme easily
+---------------------------------------------------------------- */
+:root {
+  /* Background layers */
+  --bg-page:        #0d1117;   /* outermost page background */
+  --bg-wrapper:     #111820;   /* dashboard card background */
+  --bg-panel:       #161f2b;   /* sidebar panels */
+  --bg-subpanel:    #1a2535;   /* sub-sections inside panels */
+  --bg-card:        #1e2d40;   /* incident / module cards */
+  --bg-map-overlay: rgba(13, 17, 23, 0.88); /* semi-transparent overlays on map */
+
+  /* Borders */
+  --border-color:   #2a3a50;
+  --border-radius:  6px;
+
+  /* Text */
+  --text-primary:   #e2eaf4;
+  --text-secondary: #7a93b0;
+  --text-accent:    #ffffff;
+
+  /* Accent colours */
+  --accent-red:     #e02020;   /* Red Cross / critical */
+  --accent-orange:  #e07820;   /* warning */
+  --accent-green:   #20c060;   /* ok / free */
+  --accent-blue:    #1e90ff;   /* info / primary action */
+
+  /* Top bar */
+  --topbar-bg:      #0a0f15;
+  --topbar-height:  48px;
+
+  /* Orari row */
+  --orari-height:   44px;
+
+  /* Left menu strip */
+  --menu-strip-width: 44px;
+
+  /* Side panels */
+  --panel-left-width:  200px;
+  --panel-right-width: 200px;
+
+  /* Typography */
+  --font-ui:    'Courier New', Courier, monospace; /* monospace = control-room feel */
+  --font-size-sm:   11px;
+  --font-size-base: 13px;
+  --font-size-md:   15px;
+  --font-size-lg:   18px;
+}
+
+
+/* ----------------------------------------------------------------
+   2. RESET & BASE
+---------------------------------------------------------------- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  overflow: hidden; /* dashboard fills the screen — no page scroll */
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-base);
+}
+
+ul { list-style: none; }
+button { cursor: pointer; font-family: var(--font-ui); }
+
+
+/* ----------------------------------------------------------------
+   3. DASHBOARD WRAPPER
+   Full viewport, flex column
+---------------------------------------------------------------- */
+#dashboard-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background: var(--bg-wrapper);
+  border: 1px solid var(--border-color);
+}
+
+
+/* ----------------------------------------------------------------
+   4. TOP BAR — title strip
+---------------------------------------------------------------- */
+#top-bar {
+  height: var(--topbar-height);
+  background: var(--topbar-bg);
+  border-bottom: 2px solid var(--accent-red);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0 16px;
+}
+
+#event-title {
+  font-size: var(--font-size-lg);
+  font-weight: bold;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+
+/* ----------------------------------------------------------------
+   5. ORARI ROW — two time boxes
+---------------------------------------------------------------- */
+#orari-row {
+  height: var(--orari-height);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 8px;
+  gap: 8px;
+}
+
+/* The two orario boxes sit roughly over the left & right panels */
+.orario-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 140px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 4px 12px;
+  background: var(--bg-subpanel);
+}
+
+.orario-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.orario-value {
+  font-size: var(--font-size-md);
+  font-weight: bold;
+  color: var(--accent-blue);
+  letter-spacing: 2px;
+}
+
+/* Spacer grows to fill the center (map column) space */
+#orari-spacer {
+  flex: 1;
+}
+
+
+/* ----------------------------------------------------------------
+   6. MAIN BODY — horizontal flex row
+   menu-strip | panel-soccorsi | map-container | panel-moduli
+---------------------------------------------------------------- */
+#main-body {
+  display: flex;
+  flex-direction: row;
+  flex: 1;          /* fills all remaining vertical space */
+  overflow: hidden;
+}
+
+
+/* ----------------------------------------------------------------
+   7. MENU STRIP — thin vertical nav (far left)
+---------------------------------------------------------------- */
+#menu-strip {
+  width: var(--menu-strip-width);
+  background: var(--topbar-bg);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+#menu-toggle {
+  width: 36px;
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  color: var(--text-secondary);
+  font-size: 10px;
+  padding: 6px 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  letter-spacing: 1px;
+  line-height: 1.4;
+  transition: border-color 0.2s, color 0.2s;
+}
+#menu-toggle:hover {
+  border-color: var(--accent-blue);
+  color: var(--text-accent);
+}
+
+#menu-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 0 4px;
+}
+
+.menu-item {
+  width: 100%;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--border-radius);
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.menu-item:hover {
+  background: var(--bg-card);
+}
+/* JS adds .active class to the current section */
+.menu-item.active {
+  background: var(--accent-blue);
+  color: #fff;
+}
+
+
+/* ----------------------------------------------------------------
+   8. LEFT PANEL — SOCCORSI
+---------------------------------------------------------------- */
+#panel-soccorsi {
+  width: var(--panel-left-width);
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* Shared panel title style */
+.panel-title {
+  font-size: var(--font-size-sm);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+/* Sub-panels inside SOCCORSI (attivi / chiusi) */
+.soccorsi-subpanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border-color);
+}
+.soccorsi-subpanel:last-child {
+  border-bottom: none;
+}
+
+.subpanel-title {
+  font-size: var(--font-size-sm);
+  color: var(--accent-green);
+  padding: 6px 10px 4px;
+  flex-shrink: 0;
+  letter-spacing: 1px;
+}
+/* Chiusi sub-panel title in a muted colour */
+#soccorsi-chiusi .subpanel-title {
+  color: var(--text-secondary);
+}
+
+/* Scrollable incident list inside each sub-panel */
+.incident-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Single incident card */
+.incident-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.incident-card:hover {
+  border-color: var(--accent-blue);
+}
+
+/* 
+  JS will add a coloured left border based on severity/triage:
+  .incident-card.green  → border-left: 3px solid var(--accent-green)
+  .incident-card.orange → border-left: 3px solid var(--accent-orange)
+  .incident-card.red    → border-left: 3px solid var(--accent-red)
+*/
+.incident-card.green  { border-left: 3px solid var(--accent-green); }
+.incident-card.orange { border-left: 3px solid var(--accent-orange); }
+.incident-card.red    { border-left: 3px solid var(--accent-red); }
+
+.incident-meta {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* Placeholder styling (shown before JS loads data) */
+.placeholder {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+
+/* ----------------------------------------------------------------
+   9. MAP CONTAINER — center, fills remaining width
+---------------------------------------------------------------- */
+#map-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;  /* needed for absolute overlays */
+  overflow: hidden;
+  background: #0a1520;
+}
+
+/* The actual Leaflet map div — fills the container */
+#map {
+  flex: 1;
+  width: 100%;
+  min-height: 0;    /* important: allows flex child to shrink */
+  z-index: 1;
+}
+
+/* ---- Map overlays (legend + layer buttons) ---- */
+.map-overlay {
+  position: absolute;
+  z-index: 10;       /* above the map tiles */
+  background: var(--bg-map-overlay);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 8px 10px;
+  top: 8px;
+  max-width: 140px;
+}
+
+.map-overlay-left  { left: 8px; }
+.map-overlay-right { right: 8px; }
+
+.overlay-title {
+  display: block;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+/* Legend list */
+#legend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+/* Map attribute (layer toggle) buttons */
+#map-attr-btn-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.map-attr-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  padding: 4px 8px;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+.map-attr-btn:hover {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #fff;
+}
+/* JS adds .active when a layer is toggled on */
+.map-attr-btn.active {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #fff;
+}
+
+/* ---- Bottom action buttons row ---- */
+#map-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-panel);
+  z-index: 2;
+}
+
+.map-action-btn {
+  flex: 1;
+  padding: 10px 6px;
+  background: var(--bg-subpanel);
+  border: none;
+  border-right: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+  letter-spacing: 0.5px;
+  transition: background 0.15s, color 0.15s;
+}
+.map-action-btn:last-child {
+  border-right: none;
+}
+.map-action-btn:hover {
+  background: var(--bg-card);
+  color: var(--text-accent);
+}
+
+/* Primary action button (➕ Intervento) stands out */
+.map-action-btn.btn-primary {
+  background: var(--accent-red);
+  color: #fff;
+  font-weight: bold;
+}
+.map-action-btn.btn-primary:hover {
+  background: #ff3030;
+}
+
+
+/* ----------------------------------------------------------------
+   10. RIGHT PANEL — MODULI
+---------------------------------------------------------------- */
+#panel-moduli {
+  width: var(--panel-right-width);
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* Sub-panels inside MODULI (pma / moduli) */
+.moduli-subpanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border-color);
+}
+.moduli-subpanel:last-child {
+  border-bottom: none;
+}
+
+/* PMA list */
+#pma-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pma-row {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.pma-name {
+  font-size: var(--font-size-md);
+  font-weight: bold;
+  color: var(--text-accent);
+}
+
+.pma-stats {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+/*
+  JS will add coloured classes to pma-row based on capacity:
+  .pma-row.ok       → accent-green border
+  .pma-row.warning  → accent-orange border
+  .pma-row.critical → accent-red border
+*/
+.pma-row.ok       { border-left: 3px solid var(--accent-green); }
+.pma-row.warning  { border-left: 3px solid var(--accent-orange); }
+.pma-row.critical { border-left: 3px solid var(--accent-red); }
+
+/* Moduli list */
+#moduli-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modulo-row {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 6px 8px;
+}
+
+.modulo-meta {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+
+/* ----------------------------------------------------------------
+   11. SCROLLBAR STYLING — subtle dark scrollbars
+---------------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-panel);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+
+/* ----------------------------------------------------------------
+   12. UTILITY CLASSES
+   JS can add/remove these to show states
+---------------------------------------------------------------- */
+.hidden   { display: none !important; }
+.loading  { opacity: 0.5; pointer-events: none; }
+.active   { /* see component-specific active styles above */ }
