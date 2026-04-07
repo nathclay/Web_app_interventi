@@ -1,0 +1,24 @@
+{
+  "name": "WAI — Web App Interventi",
+  "short_name": "WAI",
+  "description": "Dashboard operativo per squadre CRI sul campo",
+  "start_url": "/mobile.html",
+  "display": "standalone",
+  "background_color": "#0a0f15",
+  "theme_color": "#0a0f15",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

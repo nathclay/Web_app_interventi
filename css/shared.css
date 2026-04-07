@@ -1,0 +1,51 @@
+/* ================================================================
+   WAI — shared.css
+   CSS variables shared across mobile.html, pca.html, pma.html
+   Import this first in every page.
+================================================================ */
+
+:root {
+  /* Backgrounds */
+  --bg-page:        #0a0f15;
+  --bg-panel:       #111820;
+  --bg-card:        #161f2b;
+  --bg-card-hover:  #1a2535;
+  --bg-input:       #0d1520;
+
+  /* Borders */
+  --border:         #1e2d40;
+  --border-bright:  #2a3a50;
+
+  /* Text */
+  --text-primary:   #e2eaf4;
+  --text-secondary: #5a7a9a;
+  --text-muted:     #334455;
+  --text-white:     #ffffff;
+
+  /* Accent colours */
+  --red:            #e02020;
+  --red-dark:       #9a0f0f;
+  --red-dim:        rgba(224,32,32,0.12);
+  --orange:         #e07820;
+  --orange-dim:     rgba(224,120,32,0.12);
+  --yellow:         #d4b800;
+  --yellow-dim:     rgba(212,184,0,0.12);
+  --green:          #20c060;
+  --green-dim:      rgba(32,192,96,0.12);
+  --blue:           #1e7fff;
+  --blue-dim:       rgba(30,127,255,0.12);
+  --grey:           #445566;
+
+  /* Triage colours */
+  --triage-red:     #e02020;
+  --triage-yellow:  #d4b800;
+  --triage-green:   #20c060;
+  --triage-white:   #c8d8e8;
+
+  /* Typography */
+  --font:           'Courier New', Courier, monospace;
+
+  /* Geometry */
+  --radius:         8px;
+  --radius-lg:      14px;
+}
