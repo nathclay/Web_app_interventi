@@ -71,8 +71,6 @@ async function loadMainView() {
   onIncidentChange(() => loadIncidents());
   onResourceStatusChange(rcs => updateHeaderStatus(rcs));
 
-  // Init maps (lazy — mini-map renders immediately, coordinator map deferred)
-  initMiniMap();
 
   // Wire up tab bar
   initTabs();
@@ -211,7 +209,6 @@ function switchTab(targetId) {
   );
 
   // Invalidate Leaflet maps when switching to their panels
-  if (targetId === 'panel-map')  initCoordinatorMap();
-  if (targetId === 'panel-map')  invalidateCoordinatorMap();
-  if (targetId === 'panel-info') invalidateMiniMap();
+  if (targetId === 'panel-map')  { initCoordinatorMap(); invalidateCoordinatorMap(); }
+  if (targetId === 'panel-info') { initMiniMap(); invalidateMiniMap(); }
 }

@@ -15,6 +15,7 @@ let coordinatorMapInstance = null;
 function initMiniMap() {
   if (miniMapInstance) return;
   if (!STATE.event)    return;
+  if (typeof L === 'undefined') return;
 
   const lat = STATE.event.center_lat || 41.9;
   const lng = STATE.event.center_lng || 12.5;
@@ -50,6 +51,7 @@ function invalidateMiniMap() {
 function initCoordinatorMap() {
   if (coordinatorMapInstance) return;
   if (!STATE.event)            return;
+  if (typeof L === 'undefined') return;
 
   const lat  = STATE.event.center_lat  || 41.9;
   const lng  = STATE.event.center_lng  || 12.5;

@@ -26,7 +26,7 @@ function subscribeRealtime() {
   subscribed = true;
 
   // Incidents channel — filtered to this event
-  supabase
+  db
     .channel('mobile-incidents')
     .on('postgres_changes', {
       event:  '*',
