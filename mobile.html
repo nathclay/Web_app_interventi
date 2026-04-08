@@ -56,7 +56,7 @@
     <div class="personnel-header">
       <div class="personnel-resource-badge">
         <span class="personnel-resource-dot"></span>
-        <span id="personnel-resource-name">ASM-01</span>
+        <span id="personnel-resource-name"></span>
       </div>
       <div class="personnel-title">Chi sei?</div>
       <div class="personnel-subtitle">Seleziona il tuo nome per identificarti</div>
@@ -78,14 +78,14 @@
 
     <!-- HEADER -->
     <header id="mobile-header">
-      <div class="header-logo">🚑</div>
+      <div class="header-logo">🚑</div> <!-- TODO: change depending on resource-->
       <div class="header-info">
-        <div class="header-resource-name" id="header-resource-name">ASM-01</div>
+        <div class="header-resource-name" id="header-resource-name"></div>
         <div class="header-user-name" id="header-user-name">—</div>
       </div>
       <div class="header-status" id="header-status">
         <span class="status-dot free" id="status-dot"></span>
-        <span id="status-label">libero</span>
+        <span id="status-label"></span>
       </div>
       <div class="offline-badge" id="offline-badge">✕ offline</div>
     </header>
@@ -181,10 +181,10 @@
       <div class="panel" id="panel-info">
 
         <div class="info-resource-hero">
-          <div class="resource-type-badge ASM" id="resource-type-badge">ASM</div>
+          <div class="resource-type-badge ASM" id="resource-type-badge"></div>
           <div class="resource-hero-info">
-            <div class="resource-hero-name" id="hero-resource-name">ASM-01</div>
-            <div class="resource-hero-type" id="hero-resource-type">Ambulanza di Soccorso</div>
+            <div class="resource-hero-name" id="hero-resource-name"></div>
+            <div class="resource-hero-type" id="hero-resource-type"></div>
           </div>
         </div>
 
@@ -264,108 +264,180 @@
     </div>
     <div class="modal-body">
 
-      <!-- PAZIENTE -->
-      <div>
+      <!-- 1. CONDIZIONI DI BASE — always shown -->
+      <div class="form-section">
+        <div class="form-section-title">Condizioni di base</div>
+
+        <div class="yn-field">
+          <div class="yn-label">Coscienza <span class="required">*</span></div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no"  data-field="conscious" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="conscious" data-value="true">Sì</button>
+          </div>
+        </div>
+
+        <div class="yn-field">
+          <div class="yn-label">Respirazione <span class="required">*</span></div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no"  data-field="respiration" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="respiration" data-value="true">Sì</button>
+          </div>
+        </div>
+
+        <div class="yn-field">
+          <div class="yn-label">Frequenza respiratoria</div>
+          <div class="slider-row">
+            <input type="range" id="f-breathing-rate" min="0" max="35" value="0"
+                   oninput="document.getElementById('f-br-val').textContent = this.value == 0 ? '—' : this.value" />
+            <span id="f-br-val" class="slider-value">—</span>
+          </div>
+        </div>
+
+        <div class="yn-field">
+          <div class="yn-label">Circolo <span class="required">*</span></div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no"  data-field="circulation" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="circulation" data-value="true">Sì</button>
+          </div>
+        </div>
+
+        <div class="yn-field" style="border-bottom:none;">
+          <div class="yn-label">Cammina <span class="required">*</span></div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no"  data-field="walking" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="walking" data-value="true">Sì</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. DESCRIZIONE — always shown -->
+      <div class="form-section">
+        <div class="form-section-title">Descrizione <span class="required">*</span></div>
+        <textarea id="f-situation-notes" rows="3"
+          placeholder="Descrizione dell'intervento..."></textarea>
+      </div>
+
+      <!-- 3. PAZIENTE — always shown -->
+      <div class="form-section">
         <div class="form-section-title">Paziente</div>
-        <div class="form-row" style="margin-bottom:8px;">
+        <div class="form-row" style="margin-bottom:10px;">
           <div class="input-group">
-            <label>Nome (opz.)</label>
+            <label>Nome - Cognome</label>
             <input type="text" id="f-patient-name" placeholder="—" />
           </div>
           <div class="input-group">
-            <label>Identificatore</label>
-            <input type="text" id="f-patient-id" placeholder="es. braccialetto #12" />
+            <label>Pettorale</label>
+            <input type="text" id="f-patient-id" placeholder="-" />
           </div>
         </div>
-        <div class="form-row">
-          <div class="input-group">
-            <label>Età</label>
-            <input type="number" id="f-patient-age" placeholder="—" min="0" max="120" />
+        <div class="form-row" style="margin-bottom:10px;">
+          <div class="input-group" style = "flex:1;">
+            <label>Età apparente</label>
+            <div class="age-stepper">
+              <input type="number" id="f-patient-age" class="age-input"
+                    value="" min="0" max="120" />
+              <div class="age-arrows">
+                <button class="age-btn" id="age-up" type="button">▲</button>
+                <button class="age-btn" id="age-down" type="button">▼</button>
+              </div>
+            </div>
           </div>
-          <div class="input-group">
+          <div class="input-group" style="flex:1;">
             <label>Sesso</label>
-            <select id="f-patient-gender">
-              <option value="">—</option>
-              <option value="M">M</option>
-              <option value="F">F</option>
-              <option value="altro">Altro</option>
-            </select>
-          </div>
-          <div class="input-group">
-            <label>Tipo</label>
-            <select id="f-incident-type">
-              <option value="medical">Medico</option>
-              <option value="trauma">Trauma</option>
-              <option value="cardiac">Cardiaco</option>
-              <option value="respiratory">Respiratorio</option>
-              <option value="environmental">Ambientale</option>
-              <option value="other">Altro</option>
-            </select>
+            <div class="seg-buttons" id="f-patient-gender-btns">
+              <button class="seg-btn" data-value="M">M</button>
+              <button class="seg-btn" data-value="F">F</button>
+              <button class="seg-btn" data-value="altro">Altro</button>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- TRIAGE -->
-      <div>
-        <div class="form-section-title">Triage</div>
-        <div class="triage-selector">
-          <button class="triage-btn red"    data-triage="red">🔴 Rosso</button>
-          <button class="triage-btn yellow" data-triage="yellow">🟡 Giallo</button>
-          <button class="triage-btn green"  data-triage="green">🟢 Verde</button>
-          <button class="triage-btn white"  data-triage="white">⚪ Bianco</button>
-        </div>
-      </div>
+      <!-- 4. VALUTAZIONE CLINICA — ASM, ASI, MM only (shown/hidden by JS) -->
+      <div class="form-section clinical-only" id="section-clinical" style="display:none;">
+        <div class="form-section-title">Valutazione clinica</div>
 
-      <!-- CONDIZIONI VITALI -->
-      <div>
-        <div class="form-section-title">Condizioni</div>
-        <div class="toggle-grid">
-          <button class="toggle-btn" data-field="conscious">Cosciente</button>
-          <button class="toggle-btn" data-field="respiration">Respira</button>
-          <button class="toggle-btn" data-field="circulation">Circolo</button>
-          <button class="toggle-btn" data-field="walking">Cammina</button>
+        <div class="input-group" style="margin-bottom:10px;">
+          <label>Tipo intervento</label>
+          <select id="f-incident-type">
+            <option value="medical">Medico</option>
+            <option value="trauma">Trauma</option>
+            <option value="cardiac">Cardiaco</option>
+            <option value="respiratory">Respiratorio</option>
+            <option value="environmental">Ambientale</option>
+            <option value="other">Altro</option>
+          </select>
         </div>
-        <div class="form-row" style="margin-top:8px;">
+
+        <div class="input-group" style="margin-bottom:10px;">
+          <label>Triage</label>
+          <div class="triage-selector">
+            <button class="triage-btn white"  data-triage="white">⚪ Bianco</button>
+            <button class="triage-btn green"  data-triage="green">🟢 Verde</button>
+            <button class="triage-btn yellow" data-triage="yellow">🟡 Giallo</button>
+            <button class="triage-btn red"    data-triage="red">🔴 Rosso</button>
+          </div>
+        </div>
+
+        <div class="form-row" style="margin-bottom:10px;">
           <div class="input-group">
             <label>FC (bpm)</label>
-            <input type="number" id="f-heart-rate" placeholder="—" />
+            <input type="number" id="f-heart-rate" placeholder="—" min="0" max="300" />
           </div>
           <div class="input-group">
             <label>SpO2 (%)</label>
             <input type="number" id="f-spo2" placeholder="—" min="0" max="100" />
           </div>
           <div class="input-group">
-            <label>FR (atti/min)</label>
-            <input type="number" id="f-breathing-rate" placeholder="—" />
+            <label>GCS</label>
+            <input type="number" id="f-gcs" placeholder="—" min="3" max="15" />
           </div>
         </div>
-        <div style="margin-top:8px;">
-          <label class="form-section-title">Note cliniche</label>
+
+        <div class="input-group">
+          <label>Note cliniche</label>
           <textarea id="f-clinical-notes" rows="2" placeholder="Osservazioni, sintomi..."></textarea>
         </div>
       </div>
 
-      <!-- NOTE SITUAZIONE -->
-      <div>
-        <div class="form-section-title">Situazione</div>
-        <textarea id="f-situation-notes" rows="2"
-          placeholder="Descrizione dell'intervento..."></textarea>
+      <!-- 5. ORARIO ALLERTAMENTO — always shown -->
+      <div class="form-section">
+        <div class="form-section-title">Orario allertamento <span class="required">*</span></div>
+        <input type="datetime-local" id="f-alert-time" />
       </div>
 
-      <!-- STATO -->
-      <div>
+      <!-- 6. POSIZIONE — always shown -->
+      <div class="form-section">
+        <div class="form-section-title">Posizione</div>
+        <button class="btn-get-location" id="btn-get-location" type="button">
+          📍 Usa posizione attuale
+        </button>
+        <div id="location-display" class="location-display" style="display:none;">
+          <span id="location-coords"></span>
+          <span id="location-accuracy"></span>
+        </div>
+        <div id="location-map-container" style="display:none;margin-top:8px;border-radius:var(--radius);overflow:hidden;">
+          <iframe id="location-map-img"
+            style="width:100%;height:180px;border:none;display:block;"
+            src="">
+          </iframe>
+        </div>
+      </div>
+
+      <!-- 7. STATO — always shown -->
+      <div class="form-section">
         <div class="form-section-title">Stato attuale</div>
         <div class="status-selector">
-          <div class="status-option selected" data-status="in_progress" id="status-opt-active">
+          <div class="status-option selected" id="status-opt-active">
             <span class="status-option-icon">🚨</span>
             <div>
               <div style="font-weight:bold;">In corso</div>
               <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">
-                Intervento attivo — sto trattando il paziente
+                Sto ancora trattando il paziente
               </div>
             </div>
           </div>
-          <div class="status-option" data-status="resolved" id="status-opt-resolved">
+          <div class="status-option" id="status-opt-resolved">
             <span class="status-option-icon">✅</span>
             <div>
               <div style="font-weight:bold;">Già risolto</div>
@@ -376,30 +448,8 @@
           </div>
         </div>
 
-        <!-- Outcome sub-options (shown when "già risolto" selected) -->
-        <div class="outcome-sub" id="outcome-sub">
-          <div class="outcome-option" data-outcome="treated_and_released">
-            ✔ Trattato e dimesso
-          </div>
-          <div class="outcome-option" data-outcome="transported">
-            🚑 Trasportato
-          </div>
-          <div class="outcome-option" data-outcome="cancelled">
-            ✕ Annullato / Falso allarme
-          </div>
-        </div>
-
-        <!-- Transport destination (shown when "trasportato" selected) -->
-        <div class="transport-dest" id="transport-dest">
-          <label class="form-section-title" style="margin-top:4px;">Destinazione</label>
-          <select id="f-transport-dest">
-            <option value="">— Seleziona —</option>
-            <!-- JS populates PMA options from resources table -->
-            <option value="__hospital__">🏥 Ospedale</option>
-          </select>
-          <input type="text" id="f-hospital-name" placeholder="Nome ospedale..."
-                 style="display:none;" />
-        </div>
+        <!-- Outcome panel — injected by JS when risolto selected -->
+        <div id="form-outcome-panel"></div>
       </div>
 
       <button class="btn-submit-incident" id="btn-submit-incident">
@@ -427,6 +477,99 @@
   </div>
 </div>
 
+<!-- ============================================================
+  MODAL — AGGIUNGI VALUTAZIONE
+============================================================ -->
+<div class="modal-backdrop" id="modal-assessment">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <span class="modal-title">Nuova Valutazione</span>
+      <button class="modal-close" id="modal-assessment-close">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- CONDIZIONI DI BASE -->
+      <div class="form-section">
+        <div class="form-section-title">Condizioni di base</div>
+        <div class="yn-field">
+          <div class="yn-label">Coscienza</div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no" data-field="a_conscious" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="a_conscious" data-value="true">Sì</button>
+          </div>
+        </div>
+        <div class="yn-field">
+          <div class="yn-label">Respirazione</div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no" data-field="a_respiration" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="a_respiration" data-value="true">Sì</button>
+          </div>
+        </div>
+        <div class="yn-field">
+          <div class="yn-label">Frequenza respiratoria</div>
+          <div class="slider-row">
+            <input type="range" id="a-breathing-rate" min="0" max="40" value="0"
+                   oninput="document.getElementById('a-br-val').textContent = this.value == 0 ? '—' : this.value" />
+            <span id="a-br-val" class="slider-value">—</span>
+          </div>
+        </div>
+        <div class="yn-field">
+          <div class="yn-label">Circolo</div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no" data-field="a_circulation" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="a_circulation" data-value="true">Sì</button>
+          </div>
+        </div>
+        <div class="yn-field" style="border-bottom:none;">
+          <div class="yn-label">Cammina</div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no" data-field="a_walking" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="a_walking" data-value="true">Sì</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- VALUTAZIONE CLINICA — ASM, ASI, MM only -->
+      <div class="form-section" id="a-section-clinical" style="display:none;">
+        <div class="form-section-title">Valutazione clinica</div>
+        <div class="input-group" style="margin-bottom:10px;">
+          <label>Triage</label>
+          <div class="triage-selector">
+            <button class="triage-btn white"  data-triage="white"  data-form="assessment">⚪ Bianco</button>
+            <button class="triage-btn green"  data-triage="green"  data-form="assessment">🟢 Verde</button>
+            <button class="triage-btn yellow" data-triage="yellow" data-form="assessment">🟡 Giallo</button>
+            <button class="triage-btn red"    data-triage="red"    data-form="assessment">🔴 Rosso</button>
+          </div>
+        </div>
+        <div class="form-row" style="margin-bottom:10px;">
+          <div class="input-group">
+            <label>FC (bpm)</label>
+            <input type="number" id="a-heart-rate" placeholder="—" min="0" max="300" />
+          </div>
+          <div class="input-group">
+            <label>SpO2 (%)</label>
+            <input type="number" id="a-spo2" placeholder="—" min="0" max="100" />
+          </div>
+          <div class="input-group">
+            <label>GCS</label>
+            <input type="number" id="a-gcs" placeholder="—" min="3" max="15" />
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Note cliniche</label>
+          <textarea id="a-clinical-notes" rows="2" placeholder="Osservazioni..."></textarea>
+        </div>
+      </div>
+
+      <button class="btn-submit-incident" id="btn-submit-assessment">
+        Salva Valutazione
+      </button>
+
+    </div>
+  </div>
+</div>
+
 
 <!-- ============================================================
   SCRIPTS — load order matters:
@@ -443,33 +586,10 @@
   11. auth.js     — login flow (last, calls into all other modules)
 ============================================================ -->
 
-<!-- CDN libraries 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script> -->
-
-<!-- WAI modules 
-<script src="js/supabase.js"></script>
-<script src="js/state.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/rpc.js"></script>
-<script src="js/realtime.js"></script>
-<script src="js/location.js"></script>
-<script src="js/map.js"></script>
-<script src="js/views/incidents.js"></script>
-<script src="js/views/main.js"></script>
-<script src="js/auth.js"></script> -->
-
-<!-- Boot 
-<script>
-  // Move CDN scripts to run before DOMContentLoaded by using window.load.
-  // window.load fires after ALL scripts are parsed — safe to call supabase.
-  window.addEventListener("load", function() {
-    initAuth();   // wire up login form + personnel skip button
-    boot();       // check existing session, show correct screen
-  });
-</script> -->
-
+<!-- CDN libraries -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <script src="js/supabase.js"></script>
 <script src="js/state.js"></script>
 <script src="js/ui.js"></script>
@@ -482,7 +602,6 @@
 <script src="js/auth.js"></script>
 <script>
 window.addEventListener('load', function() {
-  console.log('auth.js:', typeof boot, typeof handleLogin, typeof loadPersonnelScreen);
   initAuth();
   boot();
 });

@@ -34,7 +34,7 @@ async function boot() {
 async function restoreResourceFromSession(email) {
   const { data: resource } = await db
     .from('resources')
-    .select('*, event_radio_channels(channel_name, description)')
+    .select('*, event_radio_channels(channel_name, description),coordinator:coordinator_id(id, resource, resource_type)')
     .eq('user_email', email)
     .single();
 

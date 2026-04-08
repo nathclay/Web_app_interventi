@@ -17,7 +17,7 @@ async function fetchIncidents() {
       .from('resources')
       .select('id')
       .eq('event_id', STATE.resource.event_id)
-      .eq('coordinator', STATE.resource.resource);
+      .eq('coordinator_id', STATE.resource.id);
 
     const resourceIds = (sectorResources || []).map(r => r.id);
     // Also include the coordinator's own resource
@@ -40,24 +40,39 @@ async function fetchIncidents() {
 
     return incidents || [];
 
-  } else {
-    // Regular resource: only incidents they have a response on
-    const { data: responses } = await db
+   } else {
+    // Active: only responses currently treating
+    const { data: activeResponses } = await db
       .from('incident_responses')
       .select('incident_id')
       .eq('resource_id', STATE.resource.id)
-      .order('assigned_at', { ascending: false });
+      .eq('outcome', 'treating');
 
-    const incidentIds = [...new Set((responses || []).map(r => r.incident_id))];
-    if (incidentIds.length === 0) return [];
+    // Closed: responses with a terminal outcome (not treating)
+    const { data: closedResponses } = await db
+      .from('incident_responses')
+      .select('incident_id')
+      .eq('resource_id', STATE.resource.id)
+      .neq('outcome', 'treating');
+
+    const activeIds = [...new Set((activeResponses || []).map(r => r.incident_id))];
+    const closedIds = [...new Set((closedResponses || []).map(r => r.incident_id))]
+      .filter(id => !activeIds.includes(id));
+
+    const allIds = [...new Set([...activeIds, ...closedIds])];
+    if (allIds.length === 0) return [];
 
     const { data: incidents } = await db
       .from('incidents')
       .select('id, incident_type, status, current_triage, patient_name, patient_identifier, patient_age, patient_gender, created_at')
-      .in('id', incidentIds)
+      .in('id', allIds)
       .order('created_at', { ascending: false });
 
-    return incidents || [];
+    const result = (incidents || []).map(i => ({
+      ...i,
+      _isActive: activeIds.includes(i.id)
+    }));
+    return result;
   }
 }
 
@@ -68,12 +83,12 @@ async function fetchIncidentDetail(incidentId) {
     .select(`
       *,
       incident_responses(
-        id, role, outcome, assigned_at, released_at, notes, hospital_info,
+        id, role, outcome, assigned_at, released_at, notes, hospital_info, resource_id,
         resources(resource, resource_type)
       ),
       patient_assessments(
         id, assessed_at, conscious, respiration, circulation,
-        walking, heart_rate, spo2, breathing_rate, GCS_total,
+        walking, heart_rate, spo2, breathing_rate, gcs_total,
         triage, notes, blood_pressure
       )
     `)
@@ -126,6 +141,17 @@ async function findActiveResponse(incidentId) {
   return data;
 }
 
+// Fetch all resources for the current event (for handoff dropdown)
+async function fetchEventResources() {
+  const { data } = await db
+    .from('resources')
+    .select('id, resource, resource_type')
+    .eq('event_id', STATE.resource.event_id)
+    .neq('id', STATE.resource.id) // exclude self
+    .order('resource');
+  return data || [];
+}
+
 /* ----------------------------------------------------------------
    PERSONNEL & CREW
 ---------------------------------------------------------------- */
@@ -148,8 +174,8 @@ async function fetchSectorResources() {
     .from('resources')
     .select('id, resource, resource_type, resources_current_status(status, active_responses)')
     .eq('event_id', STATE.resource.event_id)
-    .eq('coordinator', STATE.resource.resource);
-
+    .eq('coordinator_id', STATE.resource.id)  // ← was .eq('coordinator', STATE.resource.resource)
+    .order('resource');
   return data || [];
 }
 

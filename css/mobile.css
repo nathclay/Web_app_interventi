@@ -573,6 +573,275 @@ ul { list-style: none; }
 .empty-icon { font-size: 40px; opacity: 0.3; }
 .empty-text { font-size: 12px; color: var(--text-secondary); letter-spacing: 1px; }
 
+/* Form sections — clear visual grouping */
+.form-section {
+  padding: 16px 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+.form-section:last-of-type { border-bottom: none; }
+/* Required asterisk */
+.required { color: var(--red); margin-left: 2px; }
+/* ── Y/N buttons ── */
+.yn-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.yn-field:last-child { border-bottom: none; }
+.yn-label {
+  font-size: 13px;
+  color: var(--text-primary);
+  letter-spacing: 0.3px;
+}
+.yn-buttons {
+  display: flex;
+  gap: 8px;
+}
+.yn-btn {
+  flex: 1;
+  padding: 13px 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-bright);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  transition: all 0.15s;
+  text-align: center;
+  cursor: pointer;
+  font-family: var(--font);
+}
+.yn-btn:active { transform: scale(0.97); }
+.yn-btn.yn-no.active {
+  background: var(--bg-card);
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+  font-weight: bold;
+}
+.yn-btn.yn-yes.active {
+  background: var(--red);
+  border-color: var(--red);
+  color: var(--text-white);
+  font-weight: bold;
+}
+/* ── Slider (breathing rate) ── */
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0;
+}
+.slider-row input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-bright);
+  border: none;
+  padding: 0;
+  outline: none;
+}
+.slider-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--red);
+  cursor: pointer;
+  border: 2px solid var(--bg-panel);
+  box-shadow: 0 1px 6px rgba(0,0,0,0.4);
+}
+.slider-value {
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--text-white);
+  min-width: 32px;
+  text-align: right;
+  font-family: var(--font);
+}
+/* ── Segmented gender buttons ── */
+.seg-buttons {
+  display: flex;
+  gap: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border-bright);
+  height: 44px;
+}
+.seg-btn {
+  flex: 1;
+  padding: 0;
+  background: var(--bg-input);
+  border: none;
+  border-right: 1px solid var(--border-bright);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.seg-btn:last-child { border-right: none; }
+.seg-btn.active {
+  background: var(--red);
+  color: var(--text-white);
+  font-weight: bold;
+}
+/* ── Location section ── */
+.btn-get-location {
+  width: 100%;
+  padding: 13px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-bright);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font);
+  letter-spacing: 0.5px;
+  transition: all 0.15s;
+  text-align: center;
+  cursor: pointer;
+}
+.btn-get-location:active { transform: scale(0.98); }
+.btn-get-location.got { border-color: var(--green); color: var(--green); }
+.location-display {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  border: 1px solid var(--green);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+#location-coords {
+  font-size: 12px;
+  color: var(--green);
+  letter-spacing: 0.5px;
+}
+#location-accuracy {
+  font-size: 10px;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
+}
+/* ── Outcome panel (shared between form and detail modal) ── */
+.outcome-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+.outcome-opt {
+  padding: 13px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-bright);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font);
+}
+.outcome-opt:active { transform: scale(0.98); }
+.outcome-opt.selected {
+  border-color: var(--blue);
+  background: var(--blue-dim);
+  color: var(--text-white);
+}
+/* Sub-detail panel that appears when an outcome needing extra info is selected */
+.outcome-detail {
+  padding: 12px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  border: 1px solid var(--border-bright);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.outcome-detail-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.btn-confirm-outcome {
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--red);
+  color: white;
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  font-family: var(--font);
+  transition: all 0.15s;
+  cursor: pointer;
+  border: none;
+  margin-top: 6px;
+}
+.btn-confirm-outcome:active  { transform: scale(0.97); }
+.btn-confirm-outcome:disabled { background: var(--border-bright); color: var(--text-muted); }
+
+/* ── Age stepper ── */
+.age-stepper {
+  display: flex;
+  align-items: stretch;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-bright);
+  overflow: hidden;
+  height: 44px;
+}
+
+.age-input {
+  flex: 1;
+  background: var(--bg-input);
+  border: none;
+  color: var(--text-white);
+  font-size: 20px;
+  font-weight: bold;
+  font-family: var(--font);
+  text-align: center;
+  padding: 0 8px;
+  -moz-appearance: textfield;
+  width: 0; /* let flex size it */
+}
+.age-input::-webkit-outer-spin-button,
+.age-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.age-input:focus { outline: none; border: none; }
+
+.age-arrows {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border-bright);
+  flex-shrink: 0;
+}
+
+.age-btn {
+  width: 32px;
+  flex: 1;
+  background: var(--bg-card);
+  border: none;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  font-family: var(--font);
+  line-height: 1;
+}
+.age-btn:first-child {
+  border-bottom: 1px solid var(--border-bright);
+}
+.age-btn:active { background: var(--red); color: white; }
 /* ----------------------------------------------------------------
    PANEL 3 — INFO MODULO
 ---------------------------------------------------------------- */

@@ -22,5 +22,11 @@ const STATE = {
     status:      'in_progress',
     outcome:     null,
     transport:   null,
+  },
+
+  assessmentData: {
+    conscious: null, respiration: null,
+    circulation: null, walking: null, triage: null
   }
+
 };

@@ -10,12 +10,12 @@
    RESOURCE TYPE LABELS
 ---------------------------------------------------------------- */
 const RESOURCE_TYPE_LABELS = {
-  ASM:   'Ambulanza di Soccorso',
-  ASI:   'Ambulanza di Supporto Infermieristico',
-  SAP:   'Squadra a Piedi',
-  BICI:  'Squadra in Bicicletta',
-  MM:    'Medico Mobile',
-  LDC:   'Luogo di Coordinamento',
+  ASM:   'Ambulanza Medicalizzata',
+  ASI:   'Ambulanza Infermieristica',
+  SAP:   'Squadra appiedata',
+  BICI:  'Cri in Bici',
+  MM:    'Moto Medica',
+  LDC:   'Linea di Comando',
   PMA:   'Posto Medico Avanzato',
   ALTRO: 'Altra Risorsa',
 };
@@ -62,6 +62,19 @@ async function loadMainView() {
     loadIncidents(),
     r.resource_type === 'LDC' ? loadSectorResources() : Promise.resolve(),
   ]);
+  //status
+  const { data: rcs } = await db
+    .from('resources_current_status')
+    .select('status, active_responses')
+    .eq('resource_id', STATE.resource.id)
+    .single();
+
+  if (rcs) {
+    updateHeaderStatus(rcs);
+  } else {
+    // No status row yet — resource is free by definition
+    updateHeaderStatus({ status: 'free' });
+  }
 
   // Realtime + location
   subscribeRealtime();
@@ -83,7 +96,7 @@ async function loadMainView() {
 }
 
 /* ----------------------------------------------------------------
-   EVENT PANEL
+   PANEL: EVENTO
 ---------------------------------------------------------------- */
 function populateEventPanel() {
   const ev = STATE.event;
@@ -107,7 +120,7 @@ function populateEventPanel() {
 
   // Coordinator — fetch from resources where this resource's coordinator field is set
   if (r.coordinator) {
-    document.getElementById('coordinator-name').textContent = r.coordinator;
+    document.getElementById('coordinator-name').textContent = r.coordinator.resource;
   }
 }
 
@@ -190,7 +203,15 @@ function updateHeaderStatus(rcs) {
   dot.className    = `status-dot ${rcs.status}`;
   label.textContent = labels[rcs.status] || rcs.status;
 }
-
+// This updates the status when user changes an intervention status
+async function refreshHeaderStatus() {
+  const { data: rcs } = await db
+    .from('resources_current_status')
+    .select('status, active_responses')
+    .eq('resource_id', STATE.resource.id)
+    .single();
+  if (rcs) updateHeaderStatus(rcs);
+}
 /* ----------------------------------------------------------------
    TAB BAR
 ---------------------------------------------------------------- */
