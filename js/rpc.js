@@ -157,12 +157,13 @@ async function fetchEventResources() {
    PERSONNEL & CREW
 ---------------------------------------------------------------- */
 async function fetchCrew() {
-  const { data } = await db
+  const { data, error } = await db
     .from('personnel')
     .select('id, name, surname, role, number')
     .eq('resource', STATE.resource.id)
-    .neq('present', false)
+    //.not('present', 'eq', false) TODO: ADDcheck if present or not
     .order('name');
+  console.log('fetchCrew data:', data);
 
   return data || [];
 }
@@ -209,7 +210,7 @@ async function fetchCoordinatorCrew() {
     .from('personnel')
     .select('id, name, surname, role, number')
     .eq('resource', coord.id)
-    .neq('present', false)
+   // .neq('present', false) TODO ADD CHECK
     .order('name');
 
   return { coordinator: coord, crew: crew || [] };

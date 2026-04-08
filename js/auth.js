@@ -141,7 +141,7 @@ async function loadPersonnelScreen() {
     .from('personnel')
     .select('id, name, surname, role')
     .eq('resource', STATE.resource.id)
-    .eq('present', true)
+   // .eq('present', true) TODO: ADD CHECK
     .order('name');
 
   const list = document.getElementById('personnel-list');

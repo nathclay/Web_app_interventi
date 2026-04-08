@@ -35,6 +35,7 @@ CREATE TYPE type_enum AS ENUM (
     'MM',
     'PMA',
     'LDC',
+    'PCA',
     'ALTRO');
 
 
