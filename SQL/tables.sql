@@ -33,7 +33,7 @@ CREATE TABLE personnel (
   resource uuid REFERENCES resources(id), -- if this person is assigned to a specific resource, otherwise null
   checkin_time TIMESTAMPTZ, -- when they checked in for the event
   checkout_time TIMESTAMPTZ, -- when they checked out for the event
-  present BOOL DEFAULT FALSE, -- whether they are currently present at the event
+  present BOOL DEFAULT null, --
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
@@ -145,8 +145,10 @@ CREATE TABLE incident_responses (
   released_at TIMESTAMPTZ, -- when unit finished involvement
   role TEXT NOT NULL DEFAULT 'first_responder',-- e.g. first_responder, backup, transport, receiving
   outcome response_outcome_enum NOT NULL DEFAULT 'treating',
-  hospital_info JSONB, -- Filled only when outcome = transported (taken to hospital)
+  dest_pma_id uuid REFERENCES resources(id), --To only use when a unit is in route for a PMA, when the handoff happens we use handoff column
   handoff_to_response_id UUID REFERENCES incident_responses(id),   -- Handoff chain: points to the next response row when this unit passes to another
+  dest_hospital TEXT, -- To only use when a unit is in route for a hospital, when the patient is left we use hospital_info 
+  hospital_info JSONB, -- Filled only when outcome = taken_to_hospital
   notes TEXT,
   --assigned_by UUID REFERENCES personnel(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -176,7 +178,7 @@ CREATE TABLE patient_assessments (
   description TEXT,
   clinical_notes TEXT,
   heart_rate INTEGER,
-  blood_pressure INTEGER,   
+  blood_pressure TEXT,   
   spo2 INTEGER,
   breathing_rate INTEGER,
   temperature NUMERIC(4,1), 

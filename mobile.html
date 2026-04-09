@@ -158,6 +158,12 @@
           ＋ Nuovo Intervento
         </button>
 
+        <!-- Team filter — coordinator only -->
+        <div class="coordinator-only" id="team-filter-bar" style="
+          padding:0 16px 8px;
+          overflow-x:auto;white-space:nowrap;">
+        </div>
+
         <div class="incidents-section-title">Interventi attivi</div>
         <div id="active-incidents-list">
           <!-- JS injects incident cards here -->
@@ -188,11 +194,16 @@
           </div>
         </div>
 
-        <div class="section-block">
+        <!-- Coordinator only: squadre coordinate -->
+        <div class="section-block coordinator-only" id="coordinator-resources-block">
+          <div class="section-label">Squadre coordinate</div>
+          <div id="coordinator-resources-list"></div>
+        </div>
+
+        <!-- Regular resource: equipaggio presente -->
+        <div class="section-block" id="crew-block">
           <div class="section-label">Equipaggio presente</div>
-          <div id="crew-list">
-            <!-- JS injects crew rows here -->
-          </div>
+          <div id="crew-list"></div>
         </div>
 
         <div class="section-block" id="coordinator-crew-block" style="display:none;">
@@ -232,7 +243,7 @@
     <nav id="tab-bar">
       <button class="tab-btn active" data-tab="panel-evento">
         <span class="tab-icon">📋</span>
-        <span class="tab-label">Evento</span>
+        <span class="tab-label">Info Evento</span>
       </button>
       <button class="tab-btn" data-tab="panel-interventi">
         <span class="tab-icon">🚨</span>
@@ -269,7 +280,6 @@
       <!-- 1. CONDIZIONI DI BASE — always shown -->
       <div class="form-section">
         <div class="form-section-title">Condizioni di base</div>
-
         <div class="yn-field">
           <div class="yn-label">Coscienza <span class="required">*</span></div>
           <div class="yn-buttons">
@@ -277,7 +287,6 @@
             <button class="yn-btn yn-yes" data-field="conscious" data-value="true">Sì</button>
           </div>
         </div>
-
         <div class="yn-field">
           <div class="yn-label">Respirazione <span class="required">*</span></div>
           <div class="yn-buttons">
@@ -285,16 +294,6 @@
             <button class="yn-btn yn-yes" data-field="respiration" data-value="true">Sì</button>
           </div>
         </div>
-
-        <div class="yn-field">
-          <div class="yn-label">Frequenza respiratoria</div>
-          <div class="slider-row">
-            <input type="range" id="f-breathing-rate" min="0" max="35" value="0"
-                   oninput="document.getElementById('f-br-val').textContent = this.value == 0 ? '—' : this.value" />
-            <span id="f-br-val" class="slider-value">—</span>
-          </div>
-        </div>
-
         <div class="yn-field">
           <div class="yn-label">Circolo <span class="required">*</span></div>
           <div class="yn-buttons">
@@ -302,12 +301,18 @@
             <button class="yn-btn yn-yes" data-field="circulation" data-value="true">Sì</button>
           </div>
         </div>
-
-        <div class="yn-field" style="border-bottom:none;">
+        <div class="yn-field">
           <div class="yn-label">Cammina <span class="required">*</span></div>
           <div class="yn-buttons">
             <button class="yn-btn yn-no"  data-field="walking" data-value="false">No / Non so</button>
             <button class="yn-btn yn-yes" data-field="walking" data-value="true">Sì</button>
+          </div>
+        </div>
+      <div class="yn-field" style="border-bottom:none;">
+          <div class="yn-label">Problema Minore <span class="required">*</span></div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no"  data-field="minor_injuries" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="minor_injuries" data-value="true">Sì</button>
           </div>
         </div>
       </div>
@@ -360,18 +365,6 @@
         <div class="form-section-title">Valutazione clinica</div>
 
         <div class="input-group" style="margin-bottom:10px;">
-          <label>Tipo intervento</label>
-          <select id="f-incident-type">
-            <option value="medical">Medico</option>
-            <option value="trauma">Trauma</option>
-            <option value="cardiac">Cardiaco</option>
-            <option value="respiratory">Respiratorio</option>
-            <option value="environmental">Ambientale</option>
-            <option value="other">Altro</option>
-          </select>
-        </div>
-
-        <div class="input-group" style="margin-bottom:10px;">
           <label>Triage</label>
           <div class="triage-selector">
             <button class="triage-btn white"  data-triage="white">⚪ Bianco</button>
@@ -382,17 +375,25 @@
         </div>
 
         <div class="form-row" style="margin-bottom:10px;">
-          <div class="input-group">
-            <label>FC (bpm)</label>
+          <div class="input-group" style="flex:1;">
+            <label>FC</label>
             <input type="number" id="f-heart-rate" placeholder="—" min="0" max="300" />
           </div>
-          <div class="input-group">
-            <label>SpO2 (%)</label>
+          <div class="input-group" style="flex:1;">
+            <label>SpO2</label>
             <input type="number" id="f-spo2" placeholder="—" min="0" max="100" />
           </div>
-          <div class="input-group">
-            <label>GCS</label>
-            <input type="number" id="f-gcs" placeholder="—" min="3" max="15" />
+          <div class="input-group" style="flex:1;">
+            <label>FR</label>
+            <input type="number" id="f-breathing-rate" placeholder="—" min="0" max="35" />
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>PA</label>
+            <input type="text" id="f-blood-pressure" placeholder="—" />
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>Temp</label>
+            <input type="number" id="f-temperature" placeholder="—" step="0.1" />
           </div>
         </div>
 
@@ -495,39 +496,38 @@
       <div class="form-section">
         <div class="form-section-title">Condizioni di base</div>
         <div class="yn-field">
-          <div class="yn-label">Coscienza</div>
+          <div class="yn-label">Coscienza <span class="required">*</span></div>
           <div class="yn-buttons">
-            <button class="yn-btn yn-no" data-field="a_conscious" data-value="false">No / Non so</button>
-            <button class="yn-btn yn-yes" data-field="a_conscious" data-value="true">Sì</button>
+            <button class="yn-btn yn-no"  data-field="conscious" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="conscious" data-value="true">Sì</button>
           </div>
         </div>
         <div class="yn-field">
-          <div class="yn-label">Respirazione</div>
+          <div class="yn-label">Respirazione <span class="required">*</span></div>
           <div class="yn-buttons">
-            <button class="yn-btn yn-no" data-field="a_respiration" data-value="false">No / Non so</button>
-            <button class="yn-btn yn-yes" data-field="a_respiration" data-value="true">Sì</button>
+            <button class="yn-btn yn-no"  data-field="respiration" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="respiration" data-value="true">Sì</button>
           </div>
         </div>
         <div class="yn-field">
-          <div class="yn-label">Frequenza respiratoria</div>
-          <div class="slider-row">
-            <input type="range" id="a-breathing-rate" min="0" max="40" value="0"
-                   oninput="document.getElementById('a-br-val').textContent = this.value == 0 ? '—' : this.value" />
-            <span id="a-br-val" class="slider-value">—</span>
+          <div class="yn-label">Circolo <span class="required">*</span></div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no"  data-field="circulation" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="circulation" data-value="true">Sì</button>
           </div>
         </div>
         <div class="yn-field">
-          <div class="yn-label">Circolo</div>
+          <div class="yn-label">Cammina <span class="required">*</span></div>
           <div class="yn-buttons">
-            <button class="yn-btn yn-no" data-field="a_circulation" data-value="false">No / Non so</button>
-            <button class="yn-btn yn-yes" data-field="a_circulation" data-value="true">Sì</button>
+            <button class="yn-btn yn-no"  data-field="walking" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="walking" data-value="true">Sì</button>
           </div>
         </div>
         <div class="yn-field" style="border-bottom:none;">
-          <div class="yn-label">Cammina</div>
+          <div class="yn-label">Problema Minore <span class="required">*</span></div>
           <div class="yn-buttons">
-            <button class="yn-btn yn-no" data-field="a_walking" data-value="false">No / Non so</button>
-            <button class="yn-btn yn-yes" data-field="a_walking" data-value="true">Sì</button>
+            <button class="yn-btn yn-no"  data-field="minor_injuries" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="minor_injuries" data-value="true">Sì</button>
           </div>
         </div>
       </div>
@@ -551,17 +551,25 @@
           </div>
         </div>
         <div class="form-row" style="margin-bottom:10px;">
-          <div class="input-group">
-            <label>FC (bpm)</label>
+          <div class="input-group" style="flex:1;">
+            <label>FC</label>
             <input type="number" id="a-heart-rate" placeholder="—" min="0" max="300" />
           </div>
-          <div class="input-group">
-            <label>SpO2 (%)</label>
+          <div class="input-group" style="flex:1;">
+            <label>SpO2</label>
             <input type="number" id="a-spo2" placeholder="—" min="0" max="100" />
           </div>
-          <div class="input-group">
-            <label>GCS</label>
-            <input type="number" id="a-gcs" placeholder="—" min="3" max="15" />
+          <div class="input-group" style="flex:1;">
+            <label>FR</label>
+            <input type="number" id="a-breathing-rate" placeholder="—" min="0" max="35" />
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>PA</label>
+            <input type="text" id="a-blood-pressure" placeholder="—" />
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>Temp</label>
+            <input type="number" id="a-temperature" placeholder="—" step="0.1" />
           </div>
         </div>
         <div class="input-group">

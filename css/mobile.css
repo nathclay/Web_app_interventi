@@ -1004,6 +1004,11 @@ ul { list-style: none; }
 .transport-dest { display: none; flex-direction: column; gap: 6px; }
 .transport-dest.visible { display: flex; }
 
+.incident-status-badge.treated_in_pma { 
+  background: var(--blue-dim); 
+  color: #1060cc; 
+  border: 1px solid var(--blue); 
+}
 /* ----------------------------------------------------------------
    INCIDENT DETAIL MODAL
 ---------------------------------------------------------------- */
@@ -1169,6 +1174,12 @@ ul { list-style: none; }
 
 .coordinator-only { display: none; }
 body.is-coordinator .coordinator-only { display: flex; }
+body.is-coordinator .panel.coordinator-only { display: none; }
+body.is-coordinator .panel.coordinator-only.active { display: block; }
+body.is-coordinator #team-filter-bar { display: block; }
+body.is-coordinator #coordinator-resources-block {
+  display: block;
+}
 
 /* ----------------------------------------------------------------
    MODAL — BOTTOM SHEET

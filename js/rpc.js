@@ -11,6 +11,10 @@
 
 // Load incidents for this resource (or all sector resources for coordinator)
 async function fetchIncidents() {
+  const ACTIVE_OUTCOMES = [
+    'treating', 'en_route_to_incident',
+    'en_route_to_pma', 'en_route_to_hospital'
+  ];
   if (STATE.resource.resource_type === 'LDC') {
     // Coordinator: get all resources in their sector first
     const { data: sectorResources } = await db
@@ -34,11 +38,22 @@ async function fetchIncidents() {
 
     const { data: incidents } = await db
       .from('incidents')
-      .select('id, incident_type, status, current_triage, patient_name, patient_identifier, patient_age, patient_gender, created_at, reported_by_resource_id')
+      .select(`
+        id, incident_type, status, current_triage,
+        patient_name, patient_identifier, patient_age, patient_gender, created_at, updated_at, description,
+        incident_responses(id,
+          resource_id, outcome, released_at, hospital_info, dest_pma_id, dest_hospital,
+          resources!incident_responses_resource_id_fkey(resource, resource_type)
+        )
+      `)
       .in('id', incidentIds)
-      .order('created_at', { ascending: false });
+      .order('updated_at', { ascending: false });
 
-    return incidents || [];
+
+    return (incidents || []).map(i => ({
+      ...i,
+      _isActive: ['open', 'in_progress', 'in_progress_in_pma'].includes(i.status)
+    }));
 
    } else {
     // Active: only responses currently treating
@@ -46,34 +61,40 @@ async function fetchIncidents() {
       .from('incident_responses')
       .select('incident_id')
       .eq('resource_id', STATE.resource.id)
-      .eq('outcome', 'treating');
+      .in('outcome', ACTIVE_OUTCOMES);
 
     // Closed: responses with a terminal outcome (not treating)
     const { data: closedResponses } = await db
       .from('incident_responses')
       .select('incident_id')
       .eq('resource_id', STATE.resource.id)
-      .neq('outcome', 'treating');
+      .not('outcome', 'in', '("treating","en_route_to_incident","en_route_to_pma","en_route_to_hospital")');
 
     const activeIds = [...new Set((activeResponses || []).map(r => r.incident_id))];
     const closedIds = [...new Set((closedResponses || []).map(r => r.incident_id))]
       .filter(id => !activeIds.includes(id));
 
     const allIds = [...new Set([...activeIds, ...closedIds])];
+
     if (allIds.length === 0) return [];
 
     const { data: incidents } = await db
       .from('incidents')
-      .select('id, incident_type, status, current_triage, patient_name, patient_identifier, patient_age, patient_gender, created_at, incident_responses(resource_id, outcome, resources(resource, resource_type))'
-      )
+      .select(`
+        id, incident_type, status, current_triage,
+        patient_name, patient_identifier, patient_age, patient_gender, created_at, description, updated_at,
+        incident_responses(
+          resource_id, outcome, released_at, hospital_info, dest_pma_id, dest_hospital,
+          resources!incident_responses_resource_id_fkey(resource, resource_type)
+        )
+      `)
       .in('id', allIds)
-      .order('created_at', { ascending: false });
+      .order('updated_at', { ascending: false });
 
-    const result = (incidents || []).map(i => ({
+    return (incidents || []).map(i => ({
       ...i,
       _isActive: activeIds.includes(i.id)
     }));
-    return result;
   }
 }
 
@@ -84,13 +105,13 @@ async function fetchIncidentDetail(incidentId) {
     .select(`
       *,
       incident_responses(
-        id, role, outcome, assigned_at, released_at, notes, hospital_info, resource_id,
-        resources(resource, resource_type)
+        id, role, outcome, assigned_at, released_at, notes, hospital_info, resource_id, dest_pma_id, dest_hospital,
+        resources!incident_responses_resource_id_fkey(resource, resource_type)
       ),
       patient_assessments(
         id, assessed_at, conscious, respiration, circulation,
-        walking, heart_rate, spo2, breathing_rate, gcs_total,
-        triage, description, clinical_notes, blood_pressure
+        walking, minor_injuries, heart_rate, spo2, breathing_rate, gcs_total,
+        triage, description, clinical_notes, blood_pressure, temperature
       )
     `)
     .eq('id', incidentId)
@@ -132,10 +153,12 @@ async function updateResponseOutcome(responseId, outcome, extraFields = {}) {
 async function findActiveResponse(incidentId) {
   const { data, error } = await db
     .from('incident_responses')
-    .select('id')
+    .select('id, outcome')
     .eq('incident_id', incidentId)
     .eq('resource_id', STATE.resource.id)
-    .eq('outcome', 'treating')
+    .in('outcome', ['treating', 'en_route_to_incident', 'en_route_to_pma', 'en_route_to_hospital'])
+    .order('assigned_at', { ascending: false })
+    .limit(1)
     .single();
 
   if (error) return null;
@@ -163,8 +186,6 @@ async function fetchCrew() {
     .eq('resource', STATE.resource.id)
     //.not('present', 'eq', false) TODO: ADDcheck if present or not
     .order('name');
-  console.log('fetchCrew data:', data);
-
   return data || [];
 }
 

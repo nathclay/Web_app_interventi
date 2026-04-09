@@ -3,9 +3,10 @@
 --Incident_status
 CREATE TYPE incident_status_enum AS ENUM (
   'open',             -- recorded, no unit assigned yet
-  'in_progress',      -- at least one unit actively responding
-  'resolved',         -- patient treated and released on scene
-  'taken_to_hospital',-- patient transported
+  'in_progress',      -- at least one field unit actively responding
+  'in_progress_in_pma',  --patient treated in pma, no field unit responding
+  'resolved',         -- patient treated and released on scene (all units are free)
+  'taken_to_hospital',-- patient transported to hospital (all units are free)
   'cancelled'         -- false alarm / duplicate
 );
 
@@ -19,10 +20,16 @@ CREATE TYPE triage_enum AS ENUM (
 
 --Current outcome
 CREATE TYPE response_outcome_enum AS ENUM (
+  'en_route_to_incident', --unit not yet on the incident, already set to busy
   'treating',           -- currently active, no outcome yet
-  'treated_and_released',
-  'handed_off',         -- passed to another unit on scene
-  'transported',        -- this unit took patient to hospital/post
+  'treated_and_released', -- the unit is now free
+  'handed_off',         -- passed to another unit on scene, the original unit becomes free
+  'en_route_to_pma',     --the unit is still busy
+  'en_route_to_hospital',  --the unit is still busy
+  'taken_to_pma',     --after the patient has arrived to pma, unit is free again
+  'taken_to_hospital',        -- after the patient has arrived to hospital, unit is free again
+  'consegnato_118',
+  'refused_transport',
   'cancelled'
 );
 

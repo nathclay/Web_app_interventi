@@ -5,28 +5,33 @@
 ================================================================ */
 
 const STATE = {
-  session:   null,   // Supabase Auth session
-  resource:  null,   // resources table row for logged-in resource
-  event:     null,   // active events row
-  personnel: null,   // selected personnel row (nullable — can skip)
-  incidents: [],     // currently loaded incidents array
+  session:   null,
+  resource:  null,
+  event:     null,
+  personnel: null,
+  incidents: [],
   isOnline:  navigator.onLine,
+  activeTeamFilter: null,    // ← just a property, no STATE. prefix
 
-  // Incident form working state (reset on each form open)
   formData: {
     triage:      null,
     conscious:   null,
     respiration: null,
     circulation: null,
     walking:     null,
+    minor_injuries:null,
+    gender:      null,
     status:      'in_progress',
-    outcome:     null,
-    transport:   null,
+    outcomeType: null,
+    lat:         null,
+    lng:         null,
   },
 
   assessmentData: {
-    conscious: null, respiration: null,
-    circulation: null, walking: null, triage: null
+    conscious:   null,
+    respiration: null,
+    circulation: null,
+    walking:     null,
+    triage:      null,
   }
-
 };

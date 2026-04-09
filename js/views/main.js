@@ -30,6 +30,9 @@ async function loadMainView() {
   // Set coordinator mode — shows extra tab + sector blocks
   if (r.resource_type === 'LDC') {
     document.body.classList.add('is-coordinator');
+    await loadSectorResources();
+    await loadTeamFilter();
+    await loadCoordinatorResources();
   }
 
   // Header
@@ -207,6 +210,49 @@ function populateEventPanel() {
   }
 }
 
+/* Filter teams (coordinator only) */
+async function loadTeamFilter() {
+  const bar = document.getElementById('team-filter-bar');
+  if (!bar) return;
+
+  const resources = await fetchSectorResources();
+
+  // Add "Tutti" button + one per resource
+  const buttons = [
+    { id: null, label: 'Tutti' },
+    ...resources.map(r => ({ id: r.id, label: r.resource }))
+  ];
+
+  bar.innerHTML = buttons.map(b => `
+    <button class="team-filter-btn ${b.id === null ? 'active' : ''}"
+      data-resource-id="${b.id || ''}"
+      style="display:inline-block;margin-right:6px;padding:6px 14px;
+        border-radius:20px;border:1.5px solid var(--border-bright);
+        background:${b.id === null ? 'var(--red)' : 'var(--bg-card)'};
+        color:${b.id === null ? 'white' : 'var(--text-primary)'};
+        font-size:12px;font-weight:600;font-family:var(--font);
+        cursor:pointer;white-space:nowrap;">
+      ${b.label}
+    </button>`
+  ).join('');
+
+  // Wire up filter clicks
+  bar.querySelectorAll('.team-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      bar.querySelectorAll('.team-filter-btn').forEach(b => {
+        b.style.background = 'var(--bg-card)';
+        b.style.color = 'var(--text-primary)';
+        b.classList.remove('active');
+      });
+      btn.style.background = 'var(--red)';
+      btn.style.color = 'white';
+      btn.classList.add('active');
+
+      STATE.activeTeamFilter = btn.dataset.resourceId || null;
+      renderIncidents(); // re-render with filter
+    });
+  });
+}
 /* ----------------------------------------------------------------
    CLOCK
 ---------------------------------------------------------------- */
@@ -348,6 +394,109 @@ async function loadSectorResources() {
   });
 }
 
+async function loadCoordinatorResources() {
+  const list = document.getElementById('coordinator-resources-list');
+  if (!list) return;
+
+  const resources = await fetchSectorResources();
+
+  if (resources.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-text">Nessuna squadra</div></div>';
+    return;
+  }
+
+  const statusIcon = { free: '🟢', busy: '🟠', stopped: '⚫' };
+  const statusLabel = { free: 'Libera', busy: 'In intervento', stopped: 'Ferma' };
+
+  // Header
+  list.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;
+      padding:6px 0;border-bottom:2px solid var(--border-bright);margin-bottom:4px;">
+      <div style="font-size:10px;font-weight:700;letter-spacing:1px;
+        color:var(--text-secondary);text-transform:uppercase;">Squadra</div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:1px;
+        color:var(--text-secondary);text-transform:uppercase;">Tipo</div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:1px;
+        color:var(--text-secondary);text-transform:uppercase;">Stato</div>
+    </div>`;
+
+  resources.forEach(r => {
+    const rcs    = r.resources_current_status;
+    const status = rcs?.status || 'free';
+    const row    = document.createElement('div');
+    row.style.cssText = `display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;
+      padding:10px 0;border-bottom:1px solid var(--border);
+      align-items:center;cursor:pointer;`;
+
+    row.innerHTML = `
+      <div style="font-size:13px;font-weight:bold;color:var(--text-primary);">
+        ${r.resource}
+      </div>
+      <div style="font-size:12px;color:var(--text-secondary);font-weight:500;">
+        ${r.resource_type}
+      </div>
+      <div style="font-size:12px;font-weight:600;">
+        ${statusIcon[status]} ${statusLabel[status] || status}
+      </div>`;
+
+    row.addEventListener('click', () => openResourceDetail(r));
+    list.appendChild(row);
+  });
+}
+
+async function openResourceDetail(resource) {
+  // Fetch crew for this resource
+  const { data: crew } = await db
+    .from('personnel')
+    .select('id, name, surname, role, number')
+    .eq('resource', resource.id)
+    .order('name');
+
+  const crewRows = (crew || []).map(p => `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;
+      padding:8px 0;border-bottom:1px solid var(--border);align-items:center;">
+      <div style="font-size:13px;font-weight:500;color:var(--text-primary);">
+        ${p.name} ${p.surname}
+      </div>
+      <div>
+        ${p.number ? `<a href="tel:${p.number}" style="font-size:13px;color:var(--blue);
+          font-weight:600;text-decoration:none;">📞 ${p.number}</a>`
+          : '<span style="font-size:12px;color:var(--text-muted);">—</span>'}
+      </div>
+      <div style="font-size:12px;color:var(--text-secondary);
+        font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">
+        ${p.role || '—'}
+      </div>
+    </div>`
+  ).join('');
+
+  // Use the detail modal to show crew
+  const body = document.getElementById('detail-body');
+  body.innerHTML = `
+    <div style="margin-bottom:12px;">
+      <div style="font-size:18px;font-weight:bold;color:var(--text-primary);">
+        ${resource.resource}
+      </div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">
+        ${resource.resource_type}
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;
+      padding:6px 0;border-bottom:2px solid var(--border-bright);margin-bottom:4px;">
+      <div style="font-size:10px;font-weight:700;letter-spacing:1px;
+        color:var(--text-secondary);text-transform:uppercase;">Nome</div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:1px;
+        color:var(--text-secondary);text-transform:uppercase;">Numero</div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:1px;
+        color:var(--text-secondary);text-transform:uppercase;">Ruolo</div>
+    </div>
+    ${crewRows || '<div style="padding:16px 0;color:var(--text-secondary);">Nessun membro</div>'}
+  `;
+
+  document.getElementById('detail-title').textContent = resource.resource;
+  openModal('modal-detail');
+}
 /* ----------------------------------------------------------------
    HEADER STATUS UPDATE (from Realtime)
 ---------------------------------------------------------------- */

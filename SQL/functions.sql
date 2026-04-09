@@ -19,6 +19,8 @@ CREATE OR REPLACE FUNCTION create_incident_with_assessment(
   p_heart_rate            INTEGER,
   p_spo2                  INTEGER,
   p_breathing_rate        INTEGER,
+  p_blood_pressure        TEXT,
+  p_temperature           NUMERIC(4,1),
   p_triage                triage_enum,
   p_description           TEXT,
   p_clinical_notes        TEXT
@@ -35,8 +37,7 @@ BEGIN
   ELSE
     v_geom := NULL;
   END IF;
-
-  -- 1. Insert incident (trigger auto_create_first_response fires here)
+  -- 1. Insert incident (this is done thanks to a trigger TODO: maybe change this?) 
   INSERT INTO incidents (
     event_id, incident_type, geom,
     patient_name, patient_age, patient_gender, patient_identifier,
@@ -70,7 +71,7 @@ BEGIN
     incident_id, response_id,
     assessed_by,
     conscious, respiration, circulation, walking, minor_injuries,
-    heart_rate, spo2, breathing_rate,
+    heart_rate, spo2, breathing_rate, blood_pressure, temperature,
     triage, description, clinical_notes,
     geom
   )
@@ -78,7 +79,7 @@ BEGIN
     v_incident_id, v_response_id,
     p_personnel_id,
     p_conscious, p_respiration, p_circulation, p_walking, p_minor_injuries,
-    p_heart_rate, p_spo2, p_breathing_rate,
+    p_heart_rate, p_spo2, p_breathing_rate, p_blood_pressure, p_temperature,
     p_triage, p_description, p_clinical_notes,
     v_geom
   );
@@ -111,7 +112,6 @@ BEGIN
   INTO v_incident_id, v_event_id
   FROM incident_responses
   WHERE id = p_from_response_id;
-
   -- Create receiving team's response row
   INSERT INTO incident_responses (
     event_id, incident_id, resource_id, personnel_id,
@@ -122,7 +122,6 @@ BEGIN
     'receiving', 'treating', now()
   )
   RETURNING id INTO v_new_response;
-
   -- Close sending team's response
   UPDATE incident_responses
   SET

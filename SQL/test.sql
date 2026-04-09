@@ -1,3 +1,299 @@
+----- NEW TEST
+-- ================================================================
+-- CLEANUP — start fresh
+-- ================================================================
+DELETE FROM patient_assessments WHERE incident_id IN (
+  SELECT id FROM incidents WHERE event_id = '11111111-0000-0000-0000-000000000001'
+  AND description LIKE 'TEST%'
+);
+DELETE FROM incident_responses WHERE incident_id IN (
+  SELECT id FROM incidents WHERE event_id = '11111111-0000-0000-0000-000000000001'
+  AND description LIKE 'TEST%'
+);
+DELETE FROM incidents WHERE event_id = '11111111-0000-0000-0000-000000000001'
+  AND description LIKE 'TEST%';
+
+-- ================================================================
+-- TEST 1 — Basic field team incident
+-- Expected: status = in_progress
+-- ================================================================
+INSERT INTO incidents (id, event_id, incident_type, description, reported_by_resource_id, geom)
+VALUES (
+  'eeeeeeee-0000-0000-0000-000000000001',
+  '11111111-0000-0000-0000-000000000001',
+  'medical', 'TEST 1: basic field incident',
+  'aaaaaaaa-0000-0000-0000-000000000002', -- ASM-01
+  ST_SetSRID(ST_MakePoint(12.4796898, 41.8762663), 4326)
+);
+
+SELECT id, status, description FROM incidents 
+WHERE id = 'eeeeeeee-0000-0000-0000-000000000001';
+-- Expected: in_progress ✓
+
+-- ================================================================
+-- TEST 2 — Two teams on same incident
+-- Expected: status = in_progress, two treating responses
+-- ================================================================
+INSERT INTO incidents (id, event_id, incident_type, description, reported_by_resource_id, geom)
+VALUES (
+  'eeeeeeee-0000-0000-0000-000000000002',
+  '11111111-0000-0000-0000-000000000001',
+  'trauma', 'TEST 2: two teams',
+  'aaaaaaaa-0000-0000-0000-000000000002',
+  ST_SetSRID(ST_MakePoint(12.4796898, 41.8762663), 4326)
+);
+
+-- Add SAP as second responder
+INSERT INTO incident_responses (event_id, incident_id, resource_id, role, outcome)
+VALUES (
+  '11111111-0000-0000-0000-000000000001',
+  'eeeeeeee-0000-0000-0000-000000000002',
+  'aaaaaaaa-0000-0000-0000-000000000004', -- SAP-01
+  'backup', 'treating'
+);
+
+SELECT id, status, description FROM incidents 
+WHERE id = 'eeeeeeee-0000-0000-0000-000000000002';
+-- Expected: in_progress ✓
+
+SELECT resource_id, outcome FROM incident_responses
+WHERE incident_id = 'eeeeeeee-0000-0000-0000-000000000002';
+-- Expected: both treating ✓
+
+-- ================================================================
+-- TEST 3 — Team treats and releases
+-- Expected: status = resolved
+-- ================================================================
+INSERT INTO incidents (id, event_id, incident_type, description, reported_by_resource_id, geom)
+VALUES (
+  'eeeeeeee-0000-0000-0000-000000000003',
+  '11111111-0000-0000-0000-000000000001',
+  'medical', 'TEST 3: treated and released',
+  'aaaaaaaa-0000-0000-0000-000000000002',
+  ST_SetSRID(ST_MakePoint(12.4796898, 41.8762663), 4326)
+);
+
+UPDATE incident_responses
+SET outcome = 'treated_and_released', released_at = NOW()
+WHERE incident_id = 'eeeeeeee-0000-0000-0000-000000000003'
+  AND resource_id = 'aaaaaaaa-0000-0000-0000-000000000002';
+
+SELECT id, status FROM incidents WHERE id = 'eeeeeeee-0000-0000-0000-000000000003';
+-- Expected: resolved ✓
+
+-- ================================================================
+-- TEST 4 — Two teams, one treats and releases
+-- Expected: both responses = treated_and_released, status = resolved
+-- ================================================================
+INSERT INTO incidents (id, event_id, incident_type, description, reported_by_resource_id, geom)
+VALUES (
+  'eeeeeeee-0000-0000-0000-000000000004',
+  '11111111-0000-0000-0000-000000000001',
+  'medical', 'TEST 4: two teams one releases',
+  'aaaaaaaa-0000-0000-0000-000000000002',
+  ST_SetSRID(ST_MakePoint(12.4796898, 41.8762663), 4326)
+);
+
+INSERT INTO incident_responses (event_id, incident_id, resource_id, role, outcome)
+VALUES (
+  '11111111-0000-0000-0000-000000000001',
+  'eeeeeeee-0000-0000-0000-000000000004',
+  'aaaaaaaa-0000-0000-0000-000000000004',
+  'backup', 'treating'
+);
+
+UPDATE incident_responses
+SET outcome = 'treated_and_released', released_at = NOW()
+WHERE incident_id = 'eeeeeeee-0000-0000-0000-000000000004'
+  AND resource_id = 'aaaaaaaa-0000-0000-0000-000000000002';
+
+SELECT id, status FROM incidents WHERE id = 'eeeeeeee-0000-0000-0000-000000000004';
+-- Expected: resolved ✓
+
+SELECT resource_id, outcome FROM incident_responses
+WHERE incident_id = 'eeeeeeee-0000-0000-0000-000000000004';
+-- Expected: both treated_and_released ✓
+
+-- ================================================================
+-- TEST 5 — Team takes to hospital
+-- Expected: status = taken_to_hospital
+-- ================================================================
+INSERT INTO incidents (id, event_id, incident_type, description, reported_by_resource_id, geom)
+VALUES (
+  'eeeeeeee-0000-0000-0000-000000000005',
+  '11111111-0000-0000-0000-000000000001',
+  'cardiac', 'TEST 5: taken to hospital',
+  'aaaaaaaa-0000-0000-0000-000000000002',
+  ST_SetSRID(ST_MakePoint(12.4796898, 41.8762663), 4326)
+);
+
+UPDATE incident_responses
+SET outcome = 'taken_to_hospital', 
+    dest_hospital = 'Ospedale San Camillo',
+    released_at = NOW()
+WHERE incident_id = 'eeeeeeee-0000-0000-0000-000000000005'
+  AND resource_id = 'aaaaaaaa-0000-0000-0000-000000000002';
+
+SELECT id, status FROM incidents WHERE id = 'eeeeeeee-0000-0000-0000-000000000005';
+-- Expected: taken_to_hospital ✓
+
+-- ================================================================
+-- TEST 6 — Team takes to PMA
+-- Expected: status = treated_in_pma, PMA response = treating
+-- ================================================================
+INSERT INTO incidents (id, event_id, incident_type, description, reported_by_resource_id, geom)
+VALUES (
+  'eeeeeeee-0000-0000-0000-000000000006',
+  '11111111-0000-0000-0000-000000000001',
+  'trauma', 'TEST 6: taken to PMA',
+  'aaaaaaaa-0000-0000-0000-000000000002',
+  ST_SetSRID(ST_MakePoint(12.4796898, 41.8762663), 4326)
+);
+
+-- Use handoff_incident RPC to take to PMA
+SELECT handoff_incident(
+  (SELECT id FROM incident_responses 
+   WHERE incident_id = 'eeeeeeee-0000-0000-0000-000000000006'
+   AND resource_id = 'aaaaaaaa-0000-0000-0000-000000000002'),
+  'aaaaaaaa-0000-0000-0000-000000000005', -- PMA-01
+  NULL,
+  'taken_to_pma',
+  NULL,
+  NULL
+);
+
+SELECT id, status FROM incidents WHERE id = 'eeeeeeee-0000-0000-0000-000000000006';
+-- Expected: treated_in_pma ✓
+
+SELECT resource_id, outcome FROM incident_responses
+WHERE incident_id = 'eeeeeeee-0000-0000-0000-000000000006';
+-- Expected: ASM = taken_to_pma, PMA = treating ✓
+
+-- ================================================================
+-- TEST 7 — PMA then takes to hospital
+-- Expected: status = taken_to_hospital
+-- ================================================================
+UPDATE incident_responses
+SET outcome = 'taken_to_hospital',
+    dest_hospital = 'Ospedale Gemelli',
+    released_at = NOW()
+WHERE incident_id = 'eeeeeeee-0000-0000-0000-000000000006'
+  AND resource_id = 'aaaaaaaa-0000-0000-0000-000000000005'; -- PMA
+
+SELECT id, status FROM incidents WHERE id = 'eeeeeeee-0000-0000-0000-000000000006';
+-- Expected: taken_to_hospital ✓
+
+-- ================================================================
+-- TEST 8 — En route to PMA then cancel
+-- Expected: status stays in_progress, outcome back to treating
+-- ================================================================
+INSERT INTO incidents (id, event_id, incident_type, description, reported_by_resource_id, geom)
+VALUES (
+  'eeeeeeee-0000-0000-0000-000000000008',
+  '11111111-0000-0000-0000-000000000001',
+  'medical', 'TEST 8: en route then cancel',
+  'aaaaaaaa-0000-0000-0000-000000000002',
+  ST_SetSRID(ST_MakePoint(12.4796898, 41.8762663), 4326)
+);
+
+-- Set en route to PMA
+UPDATE incident_responses
+SET outcome = 'en_route_to_pma',
+    dest_pma_id = 'aaaaaaaa-0000-0000-0000-000000000005'
+WHERE incident_id = 'eeeeeeee-0000-0000-0000-000000000008'
+  AND resource_id = 'aaaaaaaa-0000-0000-0000-000000000002';
+
+SELECT id, status FROM incidents WHERE id = 'eeeeeeee-0000-0000-0000-000000000008';
+-- Expected: in_progress ✓ (en_route counts as active)
+
+SELECT resource_id, outcome, dest_pma_id FROM incident_responses
+WHERE incident_id = 'eeeeeeee-0000-0000-0000-000000000008';
+-- Expected: outcome = en_route_to_pma, dest_pma_id set ✓
+
+-- Cancel en route
+UPDATE incident_responses
+SET outcome = 'treating',
+    dest_pma_id = NULL
+WHERE incident_id = 'eeeeeeee-0000-0000-0000-000000000008'
+  AND resource_id = 'aaaaaaaa-0000-0000-0000-000000000002';
+
+SELECT id, status FROM incidents WHERE id = 'eeeeeeee-0000-0000-0000-000000000008';
+-- Expected: in_progress ✓
+
+SELECT resource_id, outcome FROM incident_responses
+WHERE incident_id = 'eeeeeeee-0000-0000-0000-000000000008';
+-- Expected: outcome = treating ✓
+
+-- ================================================================
+-- TEST 9 — Two teams, one goes en route to PMA
+-- Expected: sibling closes with handed_off, status = in_progress
+-- ================================================================
+INSERT INTO incidents (id, event_id, incident_type, description, reported_by_resource_id, geom)
+VALUES (
+  'eeeeeeee-0000-0000-0000-000000000009',
+  '11111111-0000-0000-0000-000000000001',
+  'trauma', 'TEST 9: two teams en route',
+  'aaaaaaaa-0000-0000-0000-000000000002',
+  ST_SetSRID(ST_MakePoint(12.4796898, 41.8762663), 4326)
+);
+
+INSERT INTO incident_responses (event_id, incident_id, resource_id, role, outcome)
+VALUES (
+  '11111111-0000-0000-0000-000000000001',
+  'eeeeeeee-0000-0000-0000-000000000009',
+  'aaaaaaaa-0000-0000-0000-000000000004',
+  'backup', 'treating'
+);
+
+-- ASM goes en route to PMA
+UPDATE incident_responses
+SET outcome = 'en_route_to_pma',
+    dest_pma_id = 'aaaaaaaa-0000-0000-0000-000000000005'
+WHERE incident_id = 'eeeeeeee-0000-0000-0000-000000000009'
+  AND resource_id = 'aaaaaaaa-0000-0000-0000-000000000002';
+
+SELECT id, status FROM incidents WHERE id = 'eeeeeeee-0000-0000-0000-000000000009';
+-- Expected: in_progress ✓ (en_route counts as active)
+
+SELECT resource_id, outcome FROM incident_responses
+WHERE incident_id = 'eeeeeeee-0000-0000-0000-000000000009';
+-- Expected: ASM = en_route_to_pma, SAP = handed_off ✓
+
+-- ================================================================
+-- TEST 10 — Walk-in to PMA (no field team)
+-- Expected: status = treated_in_pma
+-- ================================================================
+INSERT INTO incidents (id, event_id, incident_type, description, reported_by_resource_id, geom)
+VALUES (
+  'eeeeeeee-0000-0000-0000-000000000010',
+  '11111111-0000-0000-0000-000000000001',
+  'medical', 'TEST 10: walk-in to PMA',
+  'aaaaaaaa-0000-0000-0000-000000000005', -- PMA creates the incident
+  ST_SetSRID(ST_MakePoint(12.4796898, 41.8762663), 4326)
+);
+
+SELECT id, status FROM incidents WHERE id = 'eeeeeeee-0000-0000-0000-000000000010';
+-- Expected: treated_in_pma ✓
+
+SELECT resource_id, outcome FROM incident_responses
+WHERE incident_id = 'eeeeeeee-0000-0000-0000-000000000010';
+-- Expected: PMA = treating ✓
+
+-- ================================================================
+-- SUMMARY CHECK — all test incidents and their statuses
+-- ================================================================
+SELECT description, status FROM incidents
+WHERE description LIKE 'TEST%'
+ORDER BY description;
+
+
+
+
+
+
+
+
+
 ------ test inserting fake data
 -- ═══════════════════════════════════════════════════════════════
 -- 1. INSERT RESOURCES
