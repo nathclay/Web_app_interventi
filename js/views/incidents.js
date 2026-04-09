@@ -879,7 +879,7 @@ async function buildDetailHTML(inc) {
           border:1.5px solid var(--blue);color:#1060cc;font-size:13px;
           font-weight:600;background:var(--blue-dim);cursor:pointer;
           font-family:var(--font);text-align:left;">
-          🏥 Trasporto verso PMA
+          🏥 In viaggio verso PMA
         </button>
         <div id="od-enroute-pma" style="display:none;flex-direction:column;gap:8px;
           padding:12px;background:var(--bg-card);border-radius:var(--radius);
@@ -904,7 +904,7 @@ async function buildDetailHTML(inc) {
           border:1.5px solid var(--orange);color:#8a4a00;font-size:13px;
           font-weight:600;background:var(--orange-dim);cursor:pointer;
           font-family:var(--font);text-align:left;">
-          🚑 Trasporto verso ospedale
+          🚑 In viaggio verso ospedale
         </button>
         <div id="od-enroute-hospital" style="display:none;flex-direction:column;gap:8px;
           padding:12px;background:var(--bg-card);border-radius:var(--radius);
