@@ -248,6 +248,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-height: 0;
 }
 
 /* ----------------------------------------------------------------
@@ -257,7 +258,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
   background: var(--bg-panel);
   border: 1.5px solid var(--border-bright);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .pma-section-header {
@@ -299,6 +300,8 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
 ---------------------------------------------------------------- */
 .pma-table-wrapper {
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 360px;
 }
 
 .pma-table {
@@ -393,6 +396,17 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
 }
 .btn-table-action.receive:hover { background: var(--orange); color: white; }
 
+.btn-table-action.storico {
+  border-color: var(--border-bright);
+  color: var(--text-secondary);
+  background: var(--bg-card);
+}
+.btn-table-action.storico:hover {
+  background: var(--blue);
+  color: white;
+  border-color: var(--blue);
+}
+
 /* Outcome badge in closed table */
 .outcome-badge {
   padding: 3px 10px;
@@ -411,7 +425,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.5);
-  z-index: 100;
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -587,23 +601,28 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
 }
 
 .pma-triage-btn {
-  width: 40px;
+  flex: 1;
   height: 40px;
   border-radius: var(--radius);
   border: 2px solid transparent;
-  font-size: 18px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
   cursor: pointer;
   transition: all 0.15s;
-  opacity: 0.5;
-  background: var(--bg-card);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  opacity: 0.35;
+  font-family: var(--font);
 }
 .pma-triage-btn.selected {
   opacity: 1;
-  border-color: var(--text-primary);
+  border-color: black;
+  border-width: 3px !important;
   background: var(--bg-panel);
+  font-weight: 900;
+  font-size: 13px;
+  box-shadow: 0 0 0 2px var(--text-primary);
+  transform: scale(1.05);
 }
 .np-gender-btn.np-active {
   background: var(--blue) !important;
@@ -710,3 +729,9 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
 }
 .personnel-skip:hover { color: var(--text-primary); }
 
+
+.pma-triage-btn.white  { background: #8a9ab0; color: white; }
+.pma-triage-btn.green  { background: var(--green-dim); color: #18a050; border-color: var(--green) !important; }
+.pma-triage-btn.yellow { background: #fff3cd; color: #8a6000; border-color: #f0c000 !important; }
+.pma-triage-btn.red    { background: var(--red-dim); color: var(--red); border-color: var(--red) !important; }
+.pma-triage-btn.selected { opacity: 1; border-color: var(--text-primary) !important; }

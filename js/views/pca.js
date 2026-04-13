@@ -245,12 +245,13 @@ async function initPCAMap(event) {
 function resourceIcon(resource, status) {
   const colors = { free: '#3fb950', busy: '#f0883e', stopped: '#484f58' };
   const color  = colors[status] || colors.free;
-  const label  = resource.resource || resource.resource_type || '?';
-  const svg = `
+  const label = resource.resource_type === 'LDC'
+    ? 'LDC ' + (resource.resource || '').replace(/[^0-9]/g, '')
+    : (resource.resource || resource.resource_type || '?').substring(0, 8);  const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="38" height="42" viewBox="0 0 38 42">
       <rect x="1" y="1" width="36" height="30" rx="6" fill="#161b22" stroke="${color}" stroke-width="2"/>
       <text x="19" y="20" text-anchor="middle" dominant-baseline="middle"
-        font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="${color}">${label}</text>
+        font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="${color}">${label}</text>
       <polygon points="14,31 24,31 19,40" fill="${color}"/>
     </svg>`;
   return L.divIcon({ html: svg, className: '', iconSize: [38, 42], iconAnchor: [19, 40], popupAnchor: [0, -42] });

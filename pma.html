@@ -94,14 +94,14 @@
             <thead>
               <tr>
                 <th>Ora</th>
-                <th>Paziente</th>
-                <th>Squadra</th>
                 <th>Triage</th>
+                <th>Squadra</th>
+                <th>Paziente</th>
+                <th>Descrizione</th>
                 <th>Coscienza</th>
-                <th>Respira</th>
+                <th>Respiro</th>
                 <th>Circolo</th>
-                <th>Cammina</th>
-                <th>Prob. Min</th>
+                <th>Accesso Venoso</th>
                 <th>FC</th>
                 <th>FR</th>
                 <th>SpO2</th>
@@ -109,7 +109,8 @@
                 <th>Temp</th>
                 <th>GCS</th>
                 <th>HGT</th>
-                <th></th>
+                <th>Storico</th>
+                <th>Ricevi</th>
               </tr>
             </thead>
             <tbody id="tbody-incoming">
@@ -133,13 +134,14 @@
             <thead>
               <tr>
                 <th>Ora</th>
-                <th>Paziente</th>
+                <th>Letto</th>
                 <th>Triage</th>
+                <th>Paziente</th>
+                <th>Descrizione</th>
                 <th>Coscienza</th>
-                <th>Respira</th>
+                <th>Respiro</th>
                 <th>Circolo</th>
-                <th>Cammina</th>
-                <th>Prob. Min</th>
+                <th>Accesso Venoso</th>
                 <th>FC</th>
                 <th>FR</th>
                 <th>SpO2</th>
@@ -147,8 +149,9 @@
                 <th>Temp</th>
                 <th>GCS</th>
                 <th>HGT</th>
-                <th>✎</th>
-                <th>⬜</th>
+                <th>Storico</th>
+                <th>Valuta</th>
+                <th>Chiudi</th>
               </tr>
             </thead>
             <tbody id="tbody-active">
@@ -172,13 +175,13 @@
             <thead>
               <tr>
                 <th>Ora</th>
-                <th>Paziente</th>
                 <th>Triage</th>
+                <th>Paziente</th>
+                <th>Descrizione</th>
                 <th>Coscienza</th>
-                <th>Respira</th>
+                <th>Respiro</th>
                 <th>Circolo</th>
-                <th>Cammina</th>
-                <th>Prob. Min</th>
+                <th>Accesso Venoso</th>
                 <th>FC</th>
                 <th>FR</th>
                 <th>SpO2</th>
@@ -186,7 +189,9 @@
                 <th>Temp</th>
                 <th>GCS</th>
                 <th>HGT</th>
+                <th>Storico</th>
                 <th>Esito</th>
+                <th>Riapri</th>
               </tr>
             </thead>
             <tbody id="tbody-closed">
@@ -199,77 +204,80 @@
       </section>
 
     </main>
-  </div>
 
-</div>
 
-<!-- TOAST -->
-<div id="toast-container"></div>
+    <!-- TOAST -->
+    <div id="toast-container"></div>
 
-<!-- MODAL — ASSESSMENT -->
-<div class="modal-backdrop" id="modal-assessment">
-  <div class="modal-sheet pma-modal">
-    <div class="modal-header">
-      <span class="modal-title" id="assessment-modal-title">Valutazione</span>
-      <button class="modal-close" id="modal-assessment-close">✕</button>
-    </div>
-    <div class="modal-body" id="assessment-modal-body">
-    </div>
-  </div>
-</div>
-
-<!-- MODAL — CLOSE PATIENT -->
-<div class="modal-backdrop" id="modal-close-patient">
-  <div class="modal-sheet pma-modal">
-    <div class="modal-header">
-      <span class="modal-title">Chiudi paziente</span>
-      <button class="modal-close" id="modal-close-patient-close">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="input-group" style="margin-bottom:16px;">
-        <label>Esito</label>
-        <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
-          <div class="status-option" id="close-opt-dimesso">
-            <span class="status-option-icon">✔</span>
-            <div>
-              <div style="font-weight:bold;">Dimesso</div>
-              <div style="font-size:11px;color:var(--text-secondary);">Paziente trattato e dimesso</div>
-            </div>
-          </div>
-          <div class="status-option" id="close-opt-ospedale">
-            <span class="status-option-icon">🚑</span>
-            <div>
-              <div style="font-weight:bold;">Trasportato in ospedale</div>
-              <div style="font-size:11px;color:var(--text-secondary);">Consegna a unità per trasporto</div>
-            </div>
-          </div>
+    <!-- MODAL — ASSESSMENT -->
+    <div class="modal-backdrop" id="modal-assessment">
+      <div class="modal-sheet pma-modal">
+        <div class="modal-header">
+          <span class="modal-title" id="assessment-modal-title">Valutazione</span>
+          <button class="modal-close" id="modal-assessment-close">✕</button>
+        </div>
+        <div class="modal-body" id="assessment-modal-body">
         </div>
       </div>
-        <div id="close-hospital-detail" style="display:none;flex-direction:column;gap:8px;margin-bottom:16px;">
-        <div class="input-group">
-            <label>Unità che trasporta <span class="required">*</span></label>
-            <select id="close-transport-unit">
-            <option value="">— Seleziona —</option>
-            </select>
-        </div>
-      <button class="btn-submit-incident" id="btn-confirm-close-patient">
-        Conferma
-      </button>
     </div>
-  </div>
-</div>
 
-<!-- MODAL — NEW PATIENT (walk-in) -->
-<div class="modal-backdrop" id="modal-new-patient">
-  <div class="modal-sheet pma-modal">
-    <div class="modal-header">
-      <span class="modal-title">Nuovo Paziente</span>
-      <button class="modal-close" id="modal-new-patient-close">✕</button>
+    <!-- MODAL — CLOSE PATIENT -->
+    <div class="modal-backdrop" id="modal-close-patient">
+      <div class="modal-sheet pma-modal">
+        <div class="modal-header">
+          <span class="modal-title">Chiudi paziente</span>
+          <button class="modal-close" id="modal-close-patient-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="input-group" style="margin-bottom:16px;">
+            <label>Esito</label>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+              <div class="status-option" id="close-opt-dimesso">
+                <span class="status-option-icon">✔</span>
+                <div>
+                  <div style="font-weight:bold;">Dimesso</div>
+                  <div style="font-size:11px;color:var(--text-secondary);">Paziente trattato e dimesso</div>
+                </div>
+              </div>
+              <div class="status-option" id="close-opt-ospedale">
+                <span class="status-option-icon">🚑</span>
+                <div>
+                  <div style="font-weight:bold;">Trasportato in ospedale</div>
+                  <div style="font-size:11px;color:var(--text-secondary);">Consegna a unità per trasporto</div>
+                </div>
+              </div>
+            </div>
+          </div>
+            <div id="close-hospital-detail" style="display:none;flex-direction:column;gap:8px;margin-bottom:16px;">
+            <div class="input-group">
+                <label>Unità che trasporta <span class="required">*</span></label>
+                <select id="close-transport-unit">
+                <option value="">— Seleziona —</option>
+                </select>
+            </div>
+          </div>
+          <button class="btn-submit-incident" id="btn-confirm-close-patient">
+            Conferma
+          </button>
+        </div>
+      </div>
     </div>
-    <div class="modal-body" id="new-patient-body">
-      <!-- Same form fields as mobile incident form — injected by JS -->
+
+    <!-- MODAL — NEW PATIENT (walk-in) -->
+    <div class="modal-backdrop" id="modal-new-patient">
+      <div class="modal-sheet pma-modal">
+        <div class="modal-header">
+          <span class="modal-title">Nuovo Paziente</span>
+          <button class="modal-close" id="modal-new-patient-close">✕</button>
+        </div>
+        <div class="modal-body" id="new-patient-body">
+          <!-- Same form fields as mobile incident form — injected by JS -->
+        </div>
+      </div>
     </div>
+
   </div>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

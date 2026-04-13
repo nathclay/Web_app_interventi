@@ -184,7 +184,9 @@ CREATE TABLE patient_assessments (
   breathing_rate INTEGER,
   temperature NUMERIC(4,1), 
   gcs_total INTEGER, 
-  HGT TEXT, -- capillary blood glucose level
+  hgt TEXT, 
+  bed_number_pma TEXT,
+  iv_access BOOLEAN,
   gipse TEXT,
   hospital_destination TEXT, -- if known at the time of assessment
   triage triage_enum,
