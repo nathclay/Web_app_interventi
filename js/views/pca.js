@@ -9,8 +9,8 @@ const PCA = {
   map:          null,
   markers:      {},
   incMarkers:   {},
-  layers:       { ambulanze: null, pma: null, incidents: null },
-  activeLayers: new Set(['base', 'risorse', 'coordinatori', 'attivi', 'chiusi']),
+  layers: { risorse: null, coordinatori: null, attivi: null, chiusi: null },  
+  activeLayers: new Set(['base', 'risorse', 'coordinatori', 'attivi']),
   allIncidents: [],
   allResources: [],
   resource:     null,   // the logged-in PCA resource row
@@ -239,17 +239,18 @@ async function initPCAMap(event) {
   PCA.layers.risorse       = L.layerGroup().addTo(PCA.map);
   PCA.layers.coordinatori  = L.layerGroup().addTo(PCA.map);
   PCA.layers.attivi        = L.layerGroup().addTo(PCA.map);
+  PCA.layers.chiusi        = L.layerGroup();
 }
  
 function resourceIcon(resource, status) {
   const colors = { free: '#3fb950', busy: '#f0883e', stopped: '#484f58' };
   const color  = colors[status] || colors.free;
-  const label  = resource.resource_type || '?';
+  const label  = resource.resource || resource.resource_type || '?';
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="38" height="42" viewBox="0 0 38 42">
       <rect x="1" y="1" width="36" height="30" rx="6" fill="#161b22" stroke="${color}" stroke-width="2"/>
       <text x="19" y="20" text-anchor="middle" dominant-baseline="middle"
-        font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="${color}">${label}</text>
+        font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="${color}">${label}</text>
       <polygon points="14,31 24,31 19,40" fill="${color}"/>
     </svg>`;
   return L.divIcon({ html: svg, className: '', iconSize: [38, 42], iconAnchor: [19, 40], popupAnchor: [0, -42] });
@@ -298,29 +299,34 @@ function updateResourceMarker(resource, status, geom) {
 function updateIncidentMarker(incident) {
   if (!PCA.map || !incident.geom) return;
   const [lng, lat] = incident.geom.coordinates;
-  const incLayer = ['open','in_progress','in_progress_in_pma'].includes(incident.status)
-    ? PCA.layers.attivi
-    : PCA.layers.chiusi;
 
+  const isActive = ['open','in_progress'].includes(incident.status);
+  const targetLayer = isActive ? PCA.layers.attivi : PCA.layers.chiusi;
+  const resource = incident.incident_responses?.map(r => r.resources?.resource).filter(Boolean).join(', ') || '—';
+  const triage   = incident.current_triage || 'null';
+  const triageLabels = { red: 'Rosso', yellow: 'Giallo', green: 'Verde', white: 'Bianco' };
+  const triageText = triageLabels[incident.current_triage] || 'ND';
   const popup = `
-    <strong style="font-size:13px;">${formatIncidentType(incident.incident_type)}</strong><br>
-    <span style="font-size:11px;color:#8b949e;">
-      ${incident.patient_name || incident.patient_identifier || 'Paziente anonimo'}
-    </span><br>
-    <span style="font-size:11px;color:#8b949e;">
-      Ore ${formatTime(incident.created_at)}
-    </span>
-    <button onclick="openIncidentDetailModal('${incident.id}')" class="map-popup-btn">
-      Dettagli →
-    </button>`;
+    <strong style="font-size:13px;">Intervento</strong><br>
+    <span style="font-size:11px;color:#8b949e;">Risorsa: ${resource}</span><br>
+    <span style="font-size:11px;color:#8b949e;">Codice: ${triageText}</span><br>
+    <span style="font-size:11px;color:#8b949e;">Ore ${formatTime(incident.created_at)}</span>
+    <button onclick="openIncidentDetailModal('${incident.id}')" class="map-popup-btn">Dettagli →</button>`;
 
   if (PCA.incMarkers[incident.id]) {
-    PCA.incMarkers[incident.id].setLatLng([lat, lng]);
-    PCA.incMarkers[incident.id].setIcon(incidentIcon(incident.current_triage));
-    PCA.incMarkers[incident.id].getPopup().setContent(popup);
+    const marker = PCA.incMarkers[incident.id];
+    // Move to correct layer if needed — safely check both layers
+    [PCA.layers.attivi, PCA.layers.chiusi].forEach(l => {
+      if (l && l.hasLayer(marker)) l.removeLayer(marker);
+    });
+    if (targetLayer) targetLayer.addLayer(marker);
+    marker.setLatLng([lat, lng]);
+    marker.setIcon(incidentIcon(incident.current_triage));
+    marker.getPopup().setContent(popup);
   } else {
+    if (!targetLayer) return;
     const marker = L.marker([lat, lng], { icon: incidentIcon(incident.current_triage) })
-      .addTo(incLayer)
+      .addTo(targetLayer)
       .bindPopup(popup);
     PCA.incMarkers[incident.id] = marker;
   }
@@ -354,7 +360,7 @@ async function loadAllIncidents() {
       )
     `)
     .eq('event_id', PCA.eventId)
-    .neq('status', 'cancelled')
+    .not('status', 'in', '("cancelled")')
     .order('updated_at', { ascending: false });
  
   if (error) { console.error(error); return; }
@@ -362,7 +368,9 @@ async function loadAllIncidents() {
  
   renderIncidentPanels();
   updateHeaderStats();
-  PCA.allIncidents.forEach(i => { if (i.geom) updateIncidentMarker(i); });
+  PCA.allIncidents.forEach(i => { 
+    if (i.geom && i.status !== 'in_progress_in_pma') updateIncidentMarker(i); 
+  });
 }
  
 function renderIncidentPanels() {
@@ -370,7 +378,7 @@ function renderIncidentPanels() {
     ['open', 'in_progress'].includes(i.status)
   );
   const closed = PCA.allIncidents.filter(i =>
-    ['resolved', 'taken_to_hospital'].includes(i.status)
+    ['resolved', 'taken_to_hospital', 'in_progress_in_pma'].includes(i.status)
   );
  
   document.getElementById('badge-active-count').textContent = active.length;
@@ -540,24 +548,27 @@ async function openIncidentDetailModal(incidentId) {
         resources!incident_responses_resource_id_fkey(resource, resource_type)
       ),
       patient_assessments(
-        id, assessed_at, triage, conscious, respiration, circulation,
-        heart_rate, spo2, breathing_rate, blood_pressure, temperature, gcs_total, description, clinical_notes
+        id, assessed_at, response_id, triage, conscious, respiration, circulation,
+        walking, minor_injuries,
+        heart_rate, spo2, breathing_rate, blood_pressure, temperature, gcs_total,
+        description, clinical_notes,
+        personnel:assessed_by(name, surname)
       )
     `)
     .eq('id', incidentId)
     .single();
- 
+
   if (error || !inc) return;
- 
+
+  const triageLabels = { red: 'Rosso', yellow: 'Giallo', green: 'Verde', white: 'Bianco' };
+  const triageText = triageLabels[inc.current_triage] || 'Nessun codice';
+
   document.getElementById('modal-incident-title').textContent =
-    `${formatIncidentType(inc.incident_type)} — ${inc.patient_name || 'Anonimo'}`;
- 
-  const triage = inc.current_triage;
-  const triageBadge = triage
-    ? `<span class="triage-badge ${triage}">${triage.toUpperCase()}</span>`
-    : '<span style="color:var(--text-muted)">—</span>';
- 
-  const responses = (inc.incident_responses || []).map(r => `
+    `Intervento — ${triageText}`;
+
+  const responses = [...(inc.incident_responses || [])]
+  .sort((a, b) => new Date(b.assigned_at) - new Date(a.assigned_at))
+  .map(r => `
     <div class="response-entry">
       <div class="response-outcome-dot ${r.outcome}"></div>
       <div style="flex:1">
@@ -565,24 +576,55 @@ async function openIncidentDetailModal(incidentId) {
         <span style="color:var(--text-muted);font-size:11px;margin-left:6px;">${formatOutcome(r.outcome)}</span>
       </div>
       <div style="font-size:10px;color:var(--text-muted)">${formatTime(r.assigned_at)}</div>
-    </div>`).join('');
- 
-  const assessments = [...(inc.patient_assessments || [])]
-    .sort((a, b) => new Date(b.assessed_at) - new Date(a.assessed_at))
-    .map(a => `
+    </div>`).join('') || '<div class="empty-state">Nessuna risposta</div>';
+
+  const sorted = [...(inc.patient_assessments || [])]
+    .sort((a, b) => new Date(b.assessed_at) - new Date(a.assessed_at));
+
+  const yn = v => v === true ? '<span style="color:var(--green)">Sì</span>' 
+                : v === false ? '<span style="color:var(--red)">No</span>' 
+                : '—';
+
+  function buildAssessment(a) {
+    const responseResource = inc.incident_responses?.find(r => r.id === a.response_id)?.resources?.resource || '—';
+    return `
       <div class="assessment-entry">
-        <div class="assessment-time">${new Date(a.assessed_at).toLocaleString('it-IT')}</div>
-        <div class="vitals-grid">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <span style="font-size:11px;color:var(--text-muted)">${new Date(a.assessed_at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}</span>
+          <span style="font-size:11px;color:var(--text-secondary)">${responseResource}</span>
+        </div>
+        <div class="vitals-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:8px;">
+          <div class="vital-item"><strong>${yn(a.conscious)}</strong>Coscienza</div>
+          <div class="vital-item"><strong>${yn(a.respiration)}</strong>Respiro</div>
+          <div class="vital-item"><strong>${yn(a.circulation)}</strong>Circolo</div>
+          <div class="vital-item"><strong>${yn(a.walking)}</strong>Cammina</div>
+          <div class="vital-item"><strong>${yn(a.minor_injuries)}</strong>Prob. min.</div>
+          <div class="vital-item"><strong>${triageLabels[a.triage] || '—'}</strong>Triage</div>
+        </div>
+        <div class="vitals-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:8px;">
           ${a.heart_rate     ? `<div class="vital-item"><strong>${a.heart_rate}</strong>FC</div>` : ''}
           ${a.spo2           ? `<div class="vital-item"><strong>${a.spo2}%</strong>SpO2</div>` : ''}
-          ${a.blood_pressure ? `<div class="vital-item"><strong>${a.blood_pressure}</strong>PA</div>` : ''}
           ${a.breathing_rate ? `<div class="vital-item"><strong>${a.breathing_rate}</strong>FR</div>` : ''}
+          ${a.blood_pressure ? `<div class="vital-item"><strong>${a.blood_pressure}</strong>PA</div>` : ''}
           ${a.temperature    ? `<div class="vital-item"><strong>${a.temperature}°</strong>Temp</div>` : ''}
           ${a.gcs_total      ? `<div class="vital-item"><strong>${a.gcs_total}</strong>GCS</div>` : ''}
         </div>
-        ${a.clinical_notes ? `<div style="font-size:11px;color:var(--text-secondary);margin-top:6px;">${a.clinical_notes}</div>` : ''}
-      </div>`).join('') || '<div class="empty-state">Nessun rilevamento</div>';
- 
+        ${a.description    ? `<div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;">Descrizione: ${a.description}</div>` : ''}
+        ${a.clinical_notes ? `<div style="font-size:11px;color:var(--text-muted);">Note cliniche: ${a.clinical_notes}</div>` : ''}
+      </div>`;
+  }
+
+  const latestAssessment = sorted.length > 0 ? buildAssessment(sorted[0]) : '<div class="empty-state">Nessun rilevamento</div>';
+  const previousAssessments = sorted.slice(1).map(buildAssessment).join('');
+  const historyBlock = sorted.length > 1 ? `
+    <div style="margin-top:8px;">
+      <button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.textContent=this.textContent.includes('Mostra')?'Nascondi precedenti':'Mostra precedenti (${sorted.length - 1})';"
+        style="font-size:11px;color:var(--blue);background:none;border:none;cursor:pointer;padding:0;">
+        Mostra precedenti (${sorted.length - 1})
+      </button>
+      <div style="display:none;">${previousAssessments}</div>
+    </div>` : '';
+
   document.getElementById('modal-incident-body').innerHTML = `
     <div class="detail-grid">
       <div class="detail-section">
@@ -590,21 +632,17 @@ async function openIncidentDetailModal(incidentId) {
         <div class="detail-row"><span>Nome</span><span>${inc.patient_name || '—'}</span></div>
         <div class="detail-row"><span>Identificativo</span><span>${inc.patient_identifier || '—'}</span></div>
         <div class="detail-row"><span>Età</span><span>${inc.patient_age || '—'}</span></div>
-        <div class="detail-row"><span>Triage</span><span>${triageBadge}</span></div>
-        <div class="detail-row"><span>Tipo</span><span>${formatIncidentType(inc.incident_type)}</span></div>
-        <div class="detail-row"><span>Stato</span><span><span class="ic-status-tag ${inc.status}">${inc.status}</span></span></div>
-        <div class="detail-row"><span>Ora</span><span>${formatTime(inc.created_at)}</span></div>
-        ${inc.description ? `<div style="margin-top:10px;"><div class="detail-label">Note</div>
-          <div style="font-size:12px;color:var(--text-secondary);">${inc.description}</div></div>` : ''}
+        <div class="detail-row"><span>Sesso</span><span>${inc.patient_gender || '—'}</span></div>
         <div class="detail-label" style="margin-top:14px;">Risorse coinvolte</div>
-        ${responses || '<div class="empty-state">Nessuna risposta</div>'}
+        ${responses}
       </div>
       <div class="detail-section">
-        <div class="detail-label">Rilevamenti clinici</div>
-        ${assessments}
+        <div class="detail-label">Ultimo rilevamento</div>
+        ${latestAssessment}
+        ${historyBlock}
       </div>
     </div>`;
- 
+
   openModal('modal-incident');
 }
  
@@ -618,24 +656,43 @@ async function openResourceDetailModal(resourceId) {
  
   const { data: crew } = await db
     .from('personnel')
-    .select('id, name, surname, role, number')
+    .select('id, name, surname, role, number, comitato')
     .eq('resource', resourceId)
     .order('name');
  
-  const crewRows = (crew || []).map(p => `
-    <div style="display:flex;justify-content:space-between;padding:6px 0;
-      border-bottom:1px solid var(--border);font-size:12px;align-items:center;">
-      <span style="color:var(--text-primary);font-weight:600;">${p.name} ${p.surname}</span>
-      <span style="color:var(--text-muted);text-transform:uppercase;font-size:10px;">${p.role || '—'}</span>
-      ${p.number ? `<a href="tel:${p.number}" style="color:var(--blue);text-decoration:none;font-size:11px;">📞 ${p.number}</a>` : ''}
-    </div>`).join('') || '<div class="empty-state">Nessun membro</div>';
- 
+  const crewRows = (crew || []).length === 0 
+    ? '<div class="empty-state">Nessun membro</div>'
+    : `<div style="display:grid;grid-template-columns:1fr 80px 100px 90px;gap:4px;
+        padding:4px 0;border-bottom:2px solid var(--border-bright);margin-bottom:2px;">
+        <span style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Nome</span>
+        <span style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Ruolo</span>
+        <span style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Comitato</span>
+        <span style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Telefono</span>
+      </div>` +
+    (crew || []).map(p => `
+      <div style="display:grid;grid-template-columns:1fr 80px 100px 90px;gap:4px;
+        padding:6px 0;border-bottom:1px solid var(--border);align-items:center;">
+        <span style="font-size:12px;font-weight:600;color:var(--text-primary);">${p.name} ${p.surname}</span>
+        <span style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;">${p.role || '—'}</span>
+        <span style="font-size:11px;color:var(--text-secondary);">${p.comitato || '—'}</span>
+        ${p.number 
+          ? `<a href="tel:${p.number}" style="font-size:11px;color:var(--blue);text-decoration:none;">📞 ${p.number}</a>` 
+          : '<span style="font-size:11px;color:var(--text-muted);">—</span>'}
+      </div>`).join('');
+
+  const { data: incidents } = await db
+    .from('incident_responses')
+    .select('incident_id, outcome, assigned_at, incidents(incident_type, current_triage, status)')
+    .eq('resource_id', resourceId)
+    .order('assigned_at', { ascending: false });
+
   document.getElementById('modal-resource-title').textContent = resource.resource;
   document.getElementById('modal-resource-body').innerHTML = `
     <div class="detail-row" style="margin-bottom:8px;"><span>Tipo</span><span>${resource.resource_type}</span></div>
     <div class="detail-row" style="margin-bottom:8px;"><span>Stato</span>
       <span><span class="rc-status-badge ${status}">${statusItalian(status)}</span></span></div>
     <div class="detail-row" style="margin-bottom:8px;"><span>Interventi attivi</span><span>${rcs?.active_responses || 0}</span></div>
+    <div class="detail-row" style="margin-bottom:8px;"><span>Interventi totali</span><span>${incidents?.length || 0}</span></div>
     <div class="detail-row" style="margin-bottom:12px;"><span>Ultima posizione</span><span>${formatTime(rcs?.location_updated_at)}</span></div>
     ${resource.notes ? `<div style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;
       padding:8px;background:var(--bg);border-radius:var(--radius);">${resource.notes}</div>` : ''}
