@@ -552,7 +552,7 @@ async function openStorico(incidentId) {
     .sort((a, b) => new Date(b.assessed_at) - new Date(a.assessed_at));
 
   document.getElementById('assessment-modal-title').textContent =
-    (inc.patient_name || inc.patient_identifier || 'Paziente ignoto') + ' — Storico';
+    (inc.patient_name || inc.patient_identifier || 'Paziente ignoto') + ' — Storico valutazoni';
 
   const yn = v => v === true ? '<span class="yn-cell yes">Sì</span>'
                 : v === false ? '<span class="yn-cell no">No</span>'
@@ -1052,10 +1052,6 @@ async function submitPMAAssessment(responseId, incidentId) {
   if (PMA_FORM.conscious === null)      { showToast('Indica coscienza', 'error'); return; }
   if (PMA_FORM.respiration === null)    { showToast('Indica respirazione', 'error'); return; }
   if (PMA_FORM.circulation === null)    { showToast('Indica circolo', 'error'); return; }
-  if (PMA_FORM.minor_injuries === null) { showToast('Indica problema minore', 'error'); return; }
-  if (!document.getElementById('pma-description')?.value.trim()) {
-    showToast('Inserisci una descrizione', 'error'); return;
-  }
 
   btn.disabled = true;
   btn.textContent = 'Salvataggio...';
