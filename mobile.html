@@ -35,8 +35,11 @@
     </div>
   </div>
   <div id="screen-login" class="screen">
+    <button id="btn-install" style="display:none;">
+      Installa app
+    </button>
     <div class="login-logo">🚑</div>
-    <div class="login-subtitle">Web App Interventi</div>
+    <div class="login-subtitle">Coordinamento Grandi Eventi</div>
 
     <form class="login-form" id="login-form" onsubmit="return false;">
       <div class="input-group">
@@ -675,8 +678,31 @@
 <script src="js/views/mobile.js"></script>
 <script>const AUTH_MODE = 'mobile';</script>
 <script src="js/auth.js"></script>
+
 <script>
 window.addEventListener('load', function() {
+  let _installPrompt = null;
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    _installPrompt = e;
+    document.getElementById('btn-install').style.display = 'block';
+  });
+
+  document.getElementById('btn-install').addEventListener('click', async () => {
+    if (!_installPrompt) return;
+    _installPrompt.prompt();
+    const { outcome } = await _installPrompt.userChoice;
+    if (outcome === 'accepted') {
+      document.getElementById('btn-install').style.display = 'none';
+    }
+    _installPrompt = null;
+  });
+
+  window.addEventListener('appinstalled', () => {
+    document.getElementById('btn-install').style.display = 'none';
+    _installPrompt = null;
+  });
   initAuth();
   boot();
 });
