@@ -54,6 +54,9 @@ async function boot() {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
 
+  // Don't show login yet — wait for session check first
+  showScreen('screen-loading');
+
   const { data: { session } } = await db.auth.getSession();
 
   if (!session) {
@@ -98,7 +101,7 @@ async function restoreResourceFromSession(email) {
 
   STATE.event = event;
 
-  const cachedPersonnel = sessionStorage.getItem('wai_personnel');
+  const cachedPersonnel = localStorage.getItem('cge_personnel');
   if (cachedPersonnel) {
     STATE.personnel = JSON.parse(cachedPersonnel);
     launchView();
@@ -205,7 +208,7 @@ async function loadPersonnelScreen() {
 
 function selectPersonnel(p) {
   STATE.personnel = p;
-  sessionStorage.setItem('wai_personnel', JSON.stringify(p));
+  localStorage.setItem('cge_personnel', JSON.stringify(p));
   launchView();
 }
 
@@ -214,7 +217,7 @@ function selectPersonnel(p) {
 ---------------------------------------------------------------- */
 async function logout() {
   await db.auth.signOut();
-  sessionStorage.removeItem('wai_personnel');
+  localStorage.removeItem('cge_personnel');
   STATE.resource  = null;
   STATE.event     = null;
   STATE.personnel = null;
