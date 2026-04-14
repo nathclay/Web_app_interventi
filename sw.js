@@ -8,12 +8,11 @@ const CACHE_NAME = 'cge-mobile-v1';
 // Core files to cache on install
 // Supabase API calls are NOT cached — always go to network
 const CORE_FILES = [
-  '/mobile.html',
-  '/manifest.json',
+  './mobile.html',
+  './manifest.json',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
-  // Leaflet tile placeholder — actual tiles cached dynamically on browse
 ];
 
 // ── INSTALL — cache core files ────────────────────────────────
