@@ -29,6 +29,11 @@
   <!-- ============================================================
     SCREEN 1 — LOGIN
   ============================================================ -->
+  <div id="screen-loading" class="screen active">
+    <div style="margin:auto;color:var(--text-secondary);font-size:13px;">
+      Caricamento...
+    </div>
+  </div>
   <div id="screen-login" class="screen">
     <div class="login-logo">🚑</div>
     <div class="login-subtitle">Web App Interventi</div>
@@ -667,7 +672,8 @@
 <script src="js/location.js"></script>
 <script src="js/map.js"></script>
 <script src="js/views/incidents.js"></script>
-<script src="js/views/main.js"></script>
+<script src="js/views/mobile.js"></script>
+<script>const AUTH_MODE = 'mobile';</script>
 <script src="js/auth.js"></script>
 <script>
 window.addEventListener('load', function() {

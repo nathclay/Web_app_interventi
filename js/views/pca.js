@@ -21,10 +21,8 @@ const PCA = {
 };
 
 /* ── BOOT — called on window load ──────────────────────────── */
-async function bootPCA() {
-  // Wire login form
-  document.getElementById('login-form')
-    .addEventListener('submit', handlePCALogin);
+/*
+async function loadPCAView() {
 
   // Check for existing session
   const { data: { session } } = await db.auth.getSession();
@@ -49,8 +47,10 @@ async function bootPCA() {
 
   await launchDashboard(resource);
 }
+*/
 
 /* ── LOGIN FORM ────────────────────────────────────────────── */
+/*
 async function handlePCALogin(e) {
   e.preventDefault();
   const email    = document.getElementById('login-email').value.trim();
@@ -89,8 +89,9 @@ function setLoginError(msg) {
   const el = document.getElementById('login-error');
   if (el) el.textContent = msg;
 }
-
+*/
 /* ── PERSONNEL SCREEN ─────────────────────────────────────── */
+/*
 async function showPersonnelScreen(resource) {
   document.getElementById('personnel-resource-name').textContent = resource.resource;
  
@@ -135,10 +136,10 @@ async function showPersonnelScreen(resource) {
  
   showScreen('screen-personnel');
 }
-
+*/
 
 /* ── LAUNCH DASHBOARD ──────────────────────────────────────── */
-async function launchDashboard(resource) {
+async function loadPCAView(resource) {
   // Load active event
   const { data: event } = await db
     .from('events')

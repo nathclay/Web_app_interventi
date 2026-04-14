@@ -24,7 +24,7 @@ const RESOURCE_TYPE_LABELS = {
    LOAD MAIN VIEW
    Entry point called by auth.js after login + personnel selection.
 ---------------------------------------------------------------- */
-async function loadMainView() {
+async function loadMobileView() {
   const r = STATE.resource;
 
   // Set coordinator mode — shows extra tab + sector blocks
@@ -87,7 +87,6 @@ async function loadMainView() {
   // Register Realtime callbacks
   onIncidentChange(() => loadIncidents());
   onResourceStatusChange(rcs => updateHeaderStatus(rcs));
-
 
   // Wire up tab bar
   initTabs();

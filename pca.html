@@ -12,6 +12,13 @@
 <!-- ============================================================
      SCREEN: LOGIN
 ============================================================ -->
+
+<div id="screen-loading" class="screen active">
+  <div style="margin:auto;color:var(--text-secondary);font-size:13px;">
+    Caricamento...
+  </div>
+</div>
+
 <div id="screen-login" class="screen active">
   <div class="login-box">
     <div class="login-logo">🚑</div>
@@ -299,13 +306,18 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
 <script src="js/supabase.js"></script>
+<script src="js/state.js"></script>
+<script src="js/ui.js"></script>
 <script src="js/views/pca.js"></script>
+<script>const AUTH_MODE = 'pca';</script>
+<script src="js/auth.js"></script>
 
 
 <script>
-  window.addEventListener('DOMContentLoaded', () => {
-    bootPCA();
-  });
+window.addEventListener('load', function() {
+  initAuth();
+  boot();
+});
 </script>
 
 </body>

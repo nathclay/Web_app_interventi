@@ -19,17 +19,13 @@ async function loadPMAView() {
       : STATE.resource.resource;
 
   // Wire logout
-  document.getElementById('btn-logout').addEventListener('click', async () => {
-    await db.auth.signOut();
-    sessionStorage.clear();
-    location.reload();
-  });
+  document.getElementById('btn-logout').addEventListener('click', logout);
 
   // Wire new patient
   document.getElementById('btn-new-patient')
     .addEventListener('click', () => {
-        openNewPatientForm();}
-);
+        openNewPatientForm();
+  });
 
   // Wire close modals on backdrop click
   document.querySelectorAll('.modal-backdrop').forEach(b => {
@@ -54,7 +50,8 @@ async function loadPMAView() {
 
   // Auto-refresh every 30 seconds
   onIncidentChange(() => refreshPMA());
-  subscribeRealtime();}
+  subscribeRealtime();
+}
 
 /* ----------------------------------------------------------------
    MAIN DATA LOAD

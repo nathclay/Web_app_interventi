@@ -2,10 +2,6 @@ CREATE TRIGGER trg_incident_responses_updated_at
 BEFORE UPDATE ON incident_responses
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TRIGGER trg_patient_assessments_updated_at
-BEFORE UPDATE ON patient_assessments
-FOR EACH ROW EXECUTE FUNCTION set_updated_at(); 
-
 CREATE TRIGGER trg_incidents_updated_at
 BEFORE UPDATE ON incidents
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();

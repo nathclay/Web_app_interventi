@@ -11,199 +11,204 @@
 
 <div id="app">
 
-    <!-- SCREEN 1 — LOGIN (reuse same structure) -->
-    <div id="screen-login" class="screen">
-        <div class="login-logo">🏥</div>
-        <div class="login-subtitle">PMA — Posto Medico Avanzato</div>
-        <form class="login-form" id="login-form" onsubmit="return false;">
-        <div class="input-group">
-            <label for="login-email">Email risorsa</label>
-            <input type="email" id="login-email" placeholder="pma@cri.it"
-                autocomplete="email" autocorrect="off" autocapitalize="none" />
-        </div>
-        <div class="input-group">
-            <label for="login-password">Password</label>
-            <input type="password" id="login-password" placeholder="••••••••"
-                autocomplete="current-password" />
-        </div>
-        <div class="login-error" id="login-error"></div>
-        <button class="btn-login" id="btn-login" type="submit">Accedi</button>
-        </form>
+  <div id="screen-loading" class="screen active">
+    <div style="margin:auto;color:var(--text-secondary);font-size:13px;">
+      Caricamento...
     </div>
+  </div>
+  <!-- SCREEN 1 — LOGIN (reuse same structure) -->
+  <div id="screen-login" class="screen">
+      <div class="login-logo">🏥</div>
+      <div class="login-subtitle">PMA — Posto Medico Avanzato</div>
+      <form class="login-form" id="login-form" onsubmit="return false;">
+      <div class="input-group">
+          <label for="login-email">Email risorsa</label>
+          <input type="email" id="login-email" placeholder="pma@cri.it"
+              autocomplete="email" autocorrect="off" autocapitalize="none" />
+      </div>
+      <div class="input-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" placeholder="••••••••"
+              autocomplete="current-password" />
+      </div>
+      <div class="login-error" id="login-error"></div>
+      <button class="btn-login" id="btn-login" type="submit">Accedi</button>
+      </form>
+  </div>
 
-    <!-- SCREEN 2 — CHI SEI? (Personnel selection) -->
-    <div id="screen-personnel" class="screen hidden">
-        <div class="personnel-header">
-            <div class="personnel-resource-badge">
-                <span class="personnel-resource-dot"></span>
-                <span id="personnel-resource-name"></span>
-            </div>
-            <div class="personnel-title">Chi sei?</div>
-            <div class="personnel-subtitle">Seleziona il tuo nome per identificarti</div>
-        </div>
-        <div class="personnel-list" id="personnel-list"></div>
-        <div class="personnel-skip" id="personnel-skip">
-            Continua senza identificarti →
-        </div>
+  <!-- SCREEN 2 — CHI SEI? (Personnel selection) -->
+  <div id="screen-personnel" class="screen hidden">
+      <div class="personnel-header">
+          <div class="personnel-resource-badge">
+              <span class="personnel-resource-dot"></span>
+              <span id="personnel-resource-name"></span>
+          </div>
+          <div class="personnel-title">Chi sei?</div>
+          <div class="personnel-subtitle">Seleziona il tuo nome per identificarti</div>
+      </div>
+      <div class="personnel-list" id="personnel-list"></div>
+      <div class="personnel-skip" id="personnel-skip">
+          Continua senza identificarti →
+      </div>
+  </div>
+
+<!-- SCREEN 3 — MAIN PMA VIEW -->
+<div id="screen-main" class="screen hidden">
+
+  <!-- HEADER -->
+  <header id="pma-header">
+    <div class="pma-header-left">
+      <div class="header-logo">🏥</div>
+      <div>
+        <div class="header-resource-name" id="header-resource-name"></div>
+        <div class="header-user-name" id="header-user-name">—</div>
+      </div>
     </div>
-
-  <!-- SCREEN 3 — MAIN PMA VIEW -->
-  <div id="screen-main" class="screen hidden">
-
-    <!-- HEADER -->
-    <header id="pma-header">
-      <div class="pma-header-left">
-        <div class="header-logo">🏥</div>
-        <div>
-          <div class="header-resource-name" id="header-resource-name"></div>
-          <div class="header-user-name" id="header-user-name">—</div>
-        </div>
+    <div class="pma-stats" id="pma-stats">
+      <div class="pma-stat">
+        <div class="pma-stat-value" id="stat-incoming">0</div>
+        <div class="pma-stat-label">In arrivo</div>
       </div>
-      <div class="pma-stats" id="pma-stats">
-        <div class="pma-stat">
-          <div class="pma-stat-value" id="stat-incoming">0</div>
-          <div class="pma-stat-label">In arrivo</div>
-        </div>
-        <div class="pma-stat">
-          <div class="pma-stat-value" id="stat-active">0</div>
-          <div class="pma-stat-label">In trattamento</div>
-        </div>
-        <div class="pma-stat">
-          <div class="pma-stat-value" id="stat-closed">0</div>
-          <div class="pma-stat-label">Chiusi</div>
-        </div>
+      <div class="pma-stat">
+        <div class="pma-stat-value" id="stat-active">0</div>
+        <div class="pma-stat-label">In trattamento</div>
       </div>
-      <button id="btn-new-patient" class="btn-new-patient">
-        + Nuovo paziente
-      </button>
-      <button id="btn-logout" class="btn-logout">Esci</button>
-    </header>
+      <div class="pma-stat">
+        <div class="pma-stat-value" id="stat-closed">0</div>
+        <div class="pma-stat-label">Chiusi</div>
+      </div>
+    </div>
+    <button id="btn-new-patient" class="btn-new-patient">
+      + Nuovo paziente
+    </button>
+    <button id="btn-logout" class="btn-logout">Esci</button>
+  </header>
 
-    <!-- MAIN CONTENT -->
-    <main id="pma-main">
+  <!-- MAIN CONTENT -->
+  <main id="pma-main">
 
-      <!-- INCOMING SECTION -->
-      <section class="pma-section" id="section-incoming">
-        <div class="pma-section-header">
-          <span class="pma-section-icon">📨</span>
-          <span class="pma-section-title">In arrivo</span>
-          <span class="pma-section-count" id="count-incoming">0</span>
-        </div>
-        <div class="pma-table-wrapper">
-          <table class="pma-table" id="table-incoming">
-            <thead>
-              <tr>
-                <th>Ora</th>
-                <th>Triage</th>
-                <th>Squadra</th>
-                <th>Paziente</th>
-                <th>Descrizione</th>
-                <th>Coscienza</th>
-                <th>Respiro</th>
-                <th>Circolo</th>
-                <th>Acc. <br>Venoso</th>
-                <th>FC</th>
-                <th>FR</th>
-                <th>SpO2</th>
-                <th>PA</th>
-                <th>Temp</th>
-                <th>GCS</th>
-                <th>HGT</th>
-                <th>Storico</th>
-                <th>Ricevi</th>
-              </tr>
-            </thead>
-            <tbody id="tbody-incoming">
-              <tr class="empty-row">
-                <td colspan="18">Nessun paziente in arrivo</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+    <!-- INCOMING SECTION -->
+    <section class="pma-section" id="section-incoming">
+      <div class="pma-section-header">
+        <span class="pma-section-icon">📨</span>
+        <span class="pma-section-title">In arrivo</span>
+        <span class="pma-section-count" id="count-incoming">0</span>
+      </div>
+      <div class="pma-table-wrapper">
+        <table class="pma-table" id="table-incoming">
+          <thead>
+            <tr>
+              <th>Ora</th>
+              <th>Triage</th>
+              <th>Squadra</th>
+              <th>Paziente</th>
+              <th>Descrizione</th>
+              <th>Coscienza</th>
+              <th>Respiro</th>
+              <th>Circolo</th>
+              <th>Acc. <br>Venoso</th>
+              <th>FC</th>
+              <th>FR</th>
+              <th>SpO2</th>
+              <th>PA</th>
+              <th>Temp</th>
+              <th>GCS</th>
+              <th>HGT</th>
+              <th>Storico</th>
+              <th>Ricevi</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-incoming">
+            <tr class="empty-row">
+              <td colspan="18">Nessun paziente in arrivo</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-      <!-- ACTIVE SECTION -->
-      <section class="pma-section" id="section-active">
-        <div class="pma-section-header">
-          <span class="pma-section-icon">🟢</span>
-          <span class="pma-section-title">In trattamento</span>
-          <span class="pma-section-count" id="count-active">0</span>
-        </div>
-        <div class="pma-table-wrapper">
-          <table class="pma-table" id="table-active">
-            <thead>
-              <tr>
-                <th>Ora</th>
-                <th>Letto</th>
-                <th>Triage</th>
-                <th>Paziente</th>
-                <th>Descrizione</th>
-                <th>Coscienza</th>
-                <th>Respiro</th>
-                <th>Circolo</th>
-                <th>Acc. <br>Venoso</th>
-                <th>FC</th>
-                <th>FR</th>
-                <th>SpO2</th>
-                <th>PA</th>
-                <th>Temp</th>
-                <th>GCS</th>
-                <th>HGT</th>
-                <th>Storico</th>
-                <th>Valuta</th>
-                <th>Chiudi</th>
-              </tr>
-            </thead>
-            <tbody id="tbody-active">
-              <tr class="empty-row">
-                <td colspan="19">Nessun paziente in trattamento</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+    <!-- ACTIVE SECTION -->
+    <section class="pma-section" id="section-active">
+      <div class="pma-section-header">
+        <span class="pma-section-icon">🟢</span>
+        <span class="pma-section-title">In trattamento</span>
+        <span class="pma-section-count" id="count-active">0</span>
+      </div>
+      <div class="pma-table-wrapper">
+        <table class="pma-table" id="table-active">
+          <thead>
+            <tr>
+              <th>Ora</th>
+              <th>Letto</th>
+              <th>Triage</th>
+              <th>Paziente</th>
+              <th>Descrizione</th>
+              <th>Coscienza</th>
+              <th>Respiro</th>
+              <th>Circolo</th>
+              <th>Acc. <br>Venoso</th>
+              <th>FC</th>
+              <th>FR</th>
+              <th>SpO2</th>
+              <th>PA</th>
+              <th>Temp</th>
+              <th>GCS</th>
+              <th>HGT</th>
+              <th>Storico</th>
+              <th>Valuta</th>
+              <th>Chiudi</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-active">
+            <tr class="empty-row">
+              <td colspan="19">Nessun paziente in trattamento</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-      <!-- CLOSED SECTION -->
-      <section class="pma-section" id="section-closed">
-        <div class="pma-section-header">
-          <span class="pma-section-icon">✓</span>
-          <span class="pma-section-title">Chiusi</span>
-          <span class="pma-section-count" id="count-closed">0</span>
-        </div>
-        <div class="pma-table-wrapper">
-          <table class="pma-table" id="table-closed">
-            <thead>
-              <tr>
-                <th>Ora</th>
-                <th>Triage</th>
-                <th>Paziente</th>
-                <th>Descrizione</th>
-                <th>Coscienza</th>
-                <th>Respiro</th>
-                <th>Circolo</th>
-                <th>Acc. <br>Venoso</th>
-                <th>FC</th>
-                <th>FR</th>
-                <th>SpO2</th>
-                <th>PA</th>
-                <th>Temp</th>
-                <th>GCS</th>
-                <th>HGT</th>
-                <th>Storico</th>
-                <th>Esito</th>
-                <th>Riapri</th>
-              </tr>
-            </thead>
-            <tbody id="tbody-closed">
-              <tr class="empty-row">
-                <td colspan="18">Nessun paziente chiuso</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+    <!-- CLOSED SECTION -->
+    <section class="pma-section" id="section-closed">
+      <div class="pma-section-header">
+        <span class="pma-section-icon">✓</span>
+        <span class="pma-section-title">Chiusi</span>
+        <span class="pma-section-count" id="count-closed">0</span>
+      </div>
+      <div class="pma-table-wrapper">
+        <table class="pma-table" id="table-closed">
+          <thead>
+            <tr>
+              <th>Ora</th>
+              <th>Triage</th>
+              <th>Paziente</th>
+              <th>Descrizione</th>
+              <th>Coscienza</th>
+              <th>Respiro</th>
+              <th>Circolo</th>
+              <th>Acc. <br>Venoso</th>
+              <th>FC</th>
+              <th>FR</th>
+              <th>SpO2</th>
+              <th>PA</th>
+              <th>Temp</th>
+              <th>GCS</th>
+              <th>HGT</th>
+              <th>Storico</th>
+              <th>Esito</th>
+              <th>Riapri</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-closed">
+            <tr class="empty-row">
+              <td colspan="18">Nessun paziente chiuso</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-    </main>
+  </main>
 
 
     <!-- TOAST -->
@@ -281,13 +286,14 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/pma/supabase.js"></script>
-<script src="js/pma/state.js"></script>
-<script src="js/pma/ui.js"></script>
-<script src="js/pma/rpc.js"></script>
-<script src="js/pma/realtime.js"></script>
-<script src="js/pma/views/pma.js"></script>
-<script src="js/pma/auth.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/state.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/rpc.js"></script>
+<script src="js/realtime.js"></script>
+<script src="js/views/pma.js"></script>
+<script>const AUTH_MODE = 'pma';</script>
+<script src="js/auth.js"></script>
 <script>
 window.addEventListener('load', function() {
   initAuth();
