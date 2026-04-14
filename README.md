@@ -1,2 +1,2 @@
-# Web_app_interventi
-Web App interattiva degli interventi sanitari durante un grande evento
+# Coordinamento Grandi Eventi
+Web App interattiva per il coordinamento durante un grande evento

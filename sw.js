@@ -1,9 +1,9 @@
 /* ============================================================
-   WAI Service Worker — mobile.html only
+   CGE Service Worker — mobile.html only
    Handles: cache-first serving, offline incident queue
 ============================================================ */
 
-const CACHE_NAME = 'wai-mobile-v1';
+const CACHE_NAME = 'cge-mobile-v1';
 
 // Core files to cache on install
 // Supabase API calls are NOT cached — always go to network

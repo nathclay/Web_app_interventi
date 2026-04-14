@@ -168,6 +168,30 @@ ul { list-style: none; }
   font-weight: 600;
 }
 
+#btn-install {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 999;
+  background: var(--red);
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+#btn-install::before {
+  content: '⬇';
+  font-size: 14px;
+}
+
 /* ----------------------------------------------------------------
    SCREEN 3 — MAIN VIEW HEADER
 ---------------------------------------------------------------- */
