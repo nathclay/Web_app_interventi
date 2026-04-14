@@ -1,7 +1,7 @@
 {
-  "name": "WAI — Web App Interventi",
-  "short_name": "WAI",
-  "description": "Dashboard operativo per squadre CRI sul campo",
+  "name": "CGE: Coordinamento Grandi Eventi",
+  "short_name": "CGE",
+  "description": "App interattiva per coordinamento grandi eventi",
   "start_url": "/mobile.html",
   "display": "standalone",
   "background_color": "#0a0f15",
