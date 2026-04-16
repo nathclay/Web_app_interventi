@@ -109,10 +109,10 @@ DECLARE
 BEGIN
   -- Check current state of all responses for this incident
   SELECT
-    BOOL_OR(ir.outcome IN ('en_route_to_incident','treating', 'en_route_to_pma', 'en_route_to_hospital') 
+    BOOL_OR(ir.outcome IN ('en_route_to_incident','treating', 'en_route_to_pma', 'en_route_to_hospital', 'reporting') 
             AND r.resource_type != 'PMA'),
     BOOL_OR(ir.outcome = 'treating' AND r.resource_type = 'PMA'),
-    BOOL_AND(ir.outcome NOT IN ('en_route_to_incident','treating', 'en_route_to_pma', 'en_route_to_hospital'))
+    BOOL_AND(ir.outcome NOT IN ('en_route_to_incident','treating', 'en_route_to_pma', 'en_route_to_hospital', 'reporting'))
   INTO
     v_has_treating,
     v_has_pma_treating,

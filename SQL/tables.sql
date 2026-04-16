@@ -116,6 +116,7 @@ CREATE TABLE incidents (
   patient_age INTEGER,
   patient_gender TEXT,
   geom GEOMETRY(POINT, 4326), -- location of the incident (not necessarily the same as the location of the assigned unit)
+  location_description TEXT, -- free text description of the location (e.g. "Gate 3, near the big oak tree")
   incident_type incident_type_enum NOT NULL,
   description TEXT,
   reported_by_resource_id UUID REFERENCES resources(id),

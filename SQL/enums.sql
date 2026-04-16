@@ -20,6 +20,7 @@ CREATE TYPE triage_enum AS ENUM (
 
 --Current outcome
 CREATE TYPE response_outcome_enum AS ENUM (
+  'reporting', --this is only for the pca, when they are reporting the incident
   'en_route_to_incident', --unit not yet on the incident, already set to busy
   'treating',           -- currently active, no outcome yet
   'treated_and_released', -- the unit is now free

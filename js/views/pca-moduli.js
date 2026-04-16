@@ -111,7 +111,6 @@ function buildTypeSection(typeDef, resources, totalMap) {
             <th class="col-status">Stato</th>
             <th class="col-name">Nome</th>
             <th class="col-coord">Coordinatore</th>
-            <th class="col-crew">Equipaggio</th>
             <th class="col-pos">Ultima pos.</th>
             <th class="col-lastint">Ultimo int.</th>
             <th class="col-active">Attivi</th>
@@ -158,7 +157,6 @@ function buildResourceRow(r, totalMap) {
           ${coordOptions}
         </select>
       </td>
-      <td class="col-crew">${r.crew_count ?? '—'}</td>
       <td class="col-pos ${posClass}">${posAge}</td>
       <td class="col-lastint">${lastInt}</td>
       <td class="col-active">${active > 0 ? `<span class="active-badge">${active}</span>` : '—'}</td>

@@ -134,13 +134,6 @@ async function renderSoccorsiTables() {
   `;
 }
 
-/* Pure PMA = every response belongs to a PMA resource */
-function isPMAOnly(incident) {
-  const responses = incident.incident_responses || [];
-  if (responses.length === 0) return false;
-  return responses.every(r => r.resources?.resource_type === 'PMA');
-}
-
 /* ── SECTION BUILDER ───────────────────────────────────────── */
 function buildSoccorsiSection(title, incidents, isActive) {
   const badge = isActive

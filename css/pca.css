@@ -1078,6 +1078,7 @@ html, body {
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
+
 .moduli-row:last-child td { border-bottom: none; }
 .moduli-row {
   cursor: pointer;
@@ -1190,4 +1191,57 @@ html, body {
 .crc-dot.crc-unknown { 
   background: var(--text-muted); 
   opacity: 0.4;
+}
+
+/* ── PCA YN BUTTONS ────────────────────────────────────────── */
+.pca-yn-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-bright);
+  background: var(--bg);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.pca-yn-btn.active-yes {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: white;
+  font-weight: 700;
+}
+.pca-yn-btn.active-no {
+  background: var(--red-dim);
+  border-color: var(--red);
+  color: var(--red);
+  font-weight: 700;
+}
+
+/* ── PCA TRIAGE BUTTONS ────────────────────────────────────── */
+.pca-triage-btn {
+  flex: 1;
+  height: 34px;
+  border-radius: var(--radius);
+  border: 2px solid transparent;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s;
+  opacity: 0.4;
+  font-family: var(--font);
+}
+.pca-triage-btn.white  { background: rgba(200,200,200,.15); color: #ccc; border-color: #999; }
+.pca-triage-btn.green  { background: var(--green-dim);  color: var(--green);  border-color: var(--green); }
+.pca-triage-btn.yellow { background: var(--yellow-dim); color: var(--yellow); border-color: var(--yellow); }
+.pca-triage-btn.red    { background: var(--red-dim);    color: var(--red);    border-color: var(--red); }
+.pca-triage-btn.selected {
+  opacity: 1;
+  font-weight: 900;
+  box-shadow: 0 0 0 2px var(--text-primary);
+  transform: scale(1.05);
 }

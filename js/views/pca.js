@@ -37,7 +37,14 @@ async function loadPCAView() {
   document.querySelectorAll('.modal-close, [data-close]').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = btn.dataset.close || btn.closest('.modal-overlay')?.id;
-      if (id) closeModal(id);
+      if (id) {
+        closeModal(id);
+        // Destroy mini map if closing new incident modal
+        if (id === 'modal-new-incident' && _niMap) {
+          _niMap.remove();
+          _niMap = null;
+        }
+      }
     });
   });
  
@@ -224,6 +231,7 @@ function toggleMapLayer(layerName, btn) {
  
 /* ── INCIDENTS ─────────────────────────────────────────────── */
 async function loadAllIncidents() {
+  if (!document.getElementById('list-active-incidents')) return;
   const { data, error } = await db
     .from('incidents')
     .select(`
@@ -240,6 +248,7 @@ async function loadAllIncidents() {
  
   if (error) { console.error(error); return; }
   PCA.allIncidents = data || [];
+  PCA.allIncidents = (data || []).filter(i => !isPMAOnly(i));
  
   renderIncidentPanels();
   updateHeaderStats();
@@ -247,9 +256,9 @@ async function loadAllIncidents() {
     if (i.geom && i.status !== 'in_progress_in_pma') updateIncidentMarker(i); 
   });
   // Refresh PMA page if active
-if (document.getElementById('pma-tabs')) refreshPCAView();
-if (document.getElementById('soccorsi-body')) renderSoccorsiTables();
-if (document.getElementById('moduli-body'))   renderModuliTables();
+  if (document.getElementById('pma-tabs')) refreshPCAView();
+  if (document.getElementById('soccorsi-body')) renderSoccorsiTables();
+  if (document.getElementById('moduli-body'))   renderModuliTables();
 }
  
 function renderIncidentPanels() {
@@ -305,8 +314,15 @@ function selectIncident(incidentId) {
     openIncidentDetailModal(incidentId);
   }
 }
+
+function isPMAOnly(incident) {
+  const responses = incident.incident_responses || [];
+  if (responses.length === 0) return false;
+  return responses.every(r => r.resources?.resource_type === 'PMA');
+}
 /* ── RESOURCES ─────────────────────────────────────────────── */
 async function loadAllResources() {
+  if (!document.getElementById('list-all-resources')) return;
   const { data, error } = await db
     .from('resources')
     .select(`
@@ -771,9 +787,6 @@ async function openResourceDetailModal(resourceId) {
       padding:8px;background:var(--bg);border-radius:var(--radius);">${resource.notes}</div>` : ''}
     <div class="detail-label">Equipaggio</div>
     ${crewRows}`;
- 
-  document.getElementById('btn-stop-resource').onclick = () => setResourceStatus(resourceId, 'stopped');
-  document.getElementById('btn-free-resource').onclick = () => setResourceStatus(resourceId, 'free');
   openModal('modal-resource');
 }
  
@@ -789,49 +802,310 @@ async function setResourceStatus(resourceId, status) {
 }
  
 /* ── NEW INCIDENT MODAL ────────────────────────────────────── */
+const NI_FORM = {
+  conscious: null, respiration: null, circulation: null,
+  walking: null, minor_injuries: null, triage: null, iv_access: null
+};
+let _niAge    = null;
+let _niGender = null;
+let _niLat    = null;
+let _niLng    = null;
+let _niMap    = null;
+let _niMarker = null;
+
+/* ── OPEN */
 async function openNewIncidentModal() {
-  const select = document.getElementById('ni-resource');
-  select.innerHTML = '<option value="">— Senza risorsa —</option>' +
+  // Reset state
+  Object.assign(NI_FORM, {
+    conscious: null, respiration: null, circulation: null,
+    walking: null, minor_injuries: null, triage: null, iv_access: null
+  });
+  _niAge = null; _niGender = null; _niLat = null; _niLng = null;
+  _niMap = null; _niMarker = null;
+
+  const resourceOpts = '<option value="">— Senza risorsa —</option>' +
     PCA.allResources
-      .filter(r => r.resource_type !== 'PMA')
-      .map(r => `<option value="${r.id}">${r.resource} (${r.resource_type})</option>`)
-      .join('');
-  document.getElementById('ni-error').textContent = '';
+      .filter(r => !['PMA','PCA'].includes(r.resource_type))
+      .map(r => {
+        const status = r.resources_current_status?.status || 'free';
+        return `<option value="${r.id}">${r.resource} (${r.resource_type}) — ${statusItalian(status)}</option>`;
+      }).join('');
+
+  document.getElementById('ni-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <div class="form-group">
+        <label>Nome paziente</label>
+        <input type="text" id="ni-patient-name" placeholder="—" />
+      </div>
+      <div class="form-group">
+        <label>Pettorale / ID</label>
+        <input type="text" id="ni-patient-id" placeholder="—" />
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <div class="form-group">
+        <label>Età apparente</label>
+        <div style="display:flex;align-items:center;justify-content:space-between;
+          border:1px solid var(--border-bright);border-radius:var(--radius);
+          background:var(--bg);height:38px;padding:0 10px;">
+          <span id="ni-age-display" style="font-size:15px;font-weight:700;
+            color:var(--text-primary);">—</span>
+          <div style="display:flex;gap:4px;">
+            <button type="button" onclick="niAdjustAge(-10)"
+              style="width:32px;height:28px;border-radius:var(--radius);
+                border:1px solid var(--border-bright);background:var(--bg-hover);
+                color:var(--text-primary);font-size:14px;font-weight:700;cursor:pointer;">−</button>
+            <button type="button" onclick="niAdjustAge(10)"
+              style="width:32px;height:28px;border-radius:var(--radius);
+                border:1px solid var(--border-bright);background:var(--bg-hover);
+                color:var(--text-primary);font-size:14px;font-weight:700;cursor:pointer;">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Sesso</label>
+        <div style="display:flex;border-radius:var(--radius);overflow:hidden;
+          border:1px solid var(--border-bright);height:38px;">
+          ${['M','F','Altro'].map(g => `
+            <button type="button" class="ni-gender-btn" data-gender="${g}"
+              onclick="niSelectGender(this,'${g}')"
+              style="flex:1;border:none;border-right:1px solid var(--border-bright);
+                background:var(--bg);color:var(--text-primary);
+                font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;">
+              ${g}</button>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom:12px;">
+      <label>Descrizione</label>
+      <textarea id="ni-description" rows="2"
+        style="width:100%;padding:8px 10px;border-radius:var(--radius);
+          border:1px solid var(--border-bright);background:var(--bg);
+          font-family:var(--font);font-size:13px;color:var(--text-primary);resize:vertical;"
+        placeholder="Dinamica, sintomi..."></textarea>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
+      ${[['conscious','Coscienza',true],['respiration','Respiro',true]].map(([field,label,def]) => `
+        <div class="form-group">
+          <label style="font-size:11px;color:var(--text-secondary);">${label}</label>
+          <div style="display:flex;gap:6px;margin-top:4px;">
+            <button type="button" class="pca-yn-btn${def===false||NI_FORM[field]===false?' active-no':''}"
+              onclick="niSetYN(this,'${field}',false)" style="flex:1;">No</button>
+            <button type="button" class="pca-yn-btn${def===true||NI_FORM[field]===true?' active-yes':''}"
+              onclick="niSetYN(this,'${field}',true)" style="flex:1;">Sì</button>
+          </div>
+        </div>`).join('')}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
+      ${[['circulation','Circolo',true],['walking','Cammina',true]].map(([field,label,def]) => `
+        <div class="form-group">
+          <label style="font-size:11px;color:var(--text-secondary);">${label}</label>
+          <div style="display:flex;gap:6px;margin-top:4px;">
+            <button type="button" class="pca-yn-btn${def===false||NI_FORM[field]===false?' active-no':''}"
+              onclick="niSetYN(this,'${field}',false)" style="flex:1;">No</button>
+            <button type="button" class="pca-yn-btn${def===true||NI_FORM[field]===true?' active-yes':''}"
+              onclick="niSetYN(this,'${field}',true)" style="flex:1;">Sì</button>
+          </div>
+        </div>`).join('')}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
+      <div class="form-group">
+        <label style="font-size:11px;color:var(--text-secondary);">Problema Minore</label>
+        <div style="display:flex;gap:6px;margin-top:4px;">
+          <button type="button" class="pca-yn-btn"
+            onclick="niSetYN(this,'minor_injuries',false)" style="flex:1;">No</button>
+          <button type="button" class="pca-yn-btn active-yes"
+            onclick="niSetYN(this,'minor_injuries',true)" style="flex:1;">Sì</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label style="font-size:11px;color:var(--text-secondary);">Triage</label>
+        <div style="display:flex;gap:4px;margin-top:4px;">
+          ${['white','green','yellow','red'].map(t => `
+            <button type="button" class="pca-triage-btn ${t} ni-triage-btn"
+              onclick="niSetTriage('${t}')" data-triage="${t}" style="flex:1;">
+              ${t === 'white' ? 'Bianco' : t === 'green' ? 'Verde'
+                : t === 'yellow' ? 'Giallo' : 'Rosso'}
+            </button>`).join('')}
+        </div>
+      </div>
+    </div>
+
+
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px;">
+      <div class="form-group">
+        <label>FC</label>
+        <input type="number" id="ni-heart-rate" placeholder="—" min="0" max="300" />
+      </div>
+      <div class="form-group">
+        <label>FR</label>
+        <input type="number" id="ni-breathing-rate" placeholder="—" min="0" max="60" />
+      </div>
+      <div class="form-group">
+        <label>SpO2</label>
+        <input type="number" id="ni-spo2" placeholder="—" min="0" max="100" />
+      </div>
+      <div class="form-group">
+        <label>PA</label>
+        <input type="text" id="ni-blood-pressure" placeholder="—" />
+      </div>
+      <div class="form-group">
+        <label>Temp</label>
+        <input type="number" id="ni-temperature" placeholder="—" step="0.1" />
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <div class="form-group">
+        <label>Posizione sulla mappa</label>
+        <div id="ni-map-container" style="height:180px;border-radius:var(--radius);
+          border:1px solid var(--border-bright);overflow:hidden;margin-top:4px;">
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">
+          Clicca sulla mappa per posizionare il marker
+        </div>
+        <div id="ni-coords" style="font-size:10px;color:var(--text-secondary);margin-top:2px;"></div>
+      </div>
+      <div class="form-group">
+        <label>Descrizione luogo</label>
+        <textarea id="ni-location-desc" rows="4"
+          style="width:100%;padding:8px 10px;border-radius:var(--radius);
+            border:1px solid var(--border-bright);background:var(--bg);
+            font-family:var(--font);font-size:13px;color:var(--text-primary);resize:vertical;"
+          placeholder="Es. Km 12 del percorso, zona ristoro nord..."></textarea>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px;">
+      <div class="form-group">
+        <label>Risorsa assegnata</label>
+        <select id="ni-resource">${resourceOpts}</select>
+      </div>
+      <div class="form-group">
+        <label>Outcome iniziale</label>
+        <select id="ni-outcome">
+          <option value="treating">In trattamento</option>
+          <option value="en_route_to_incident">In arrivo</option>
+        </select>
+      </div>
+    </div>
+    <div id="ni-error" class="error-msg"></div>`;
+
   document.getElementById('btn-submit-incident').onclick = submitNewIncident;
   openModal('modal-new-incident');
+
+  // Init mini map after modal is visible
+  setTimeout(() => {
+    const center = PCA.map ? PCA.map.getCenter() : { lat: 41.9, lng: 12.5 };
+    const zoom   = PCA.map ? PCA.map.getZoom()   : 14;
+
+    _niMap = L.map('ni-map-container', { zoomControl: true })
+      .setView([center.lat, center.lng], zoom);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '© OpenStreetMap © CartoDB',
+      subdomains: 'abcd', maxZoom: 19,
+    }).addTo(_niMap);
+
+    _niMap.on('click', e => {
+      _niLat = e.latlng.lat;
+      _niLng = e.latlng.lng;
+
+      if (_niMarker) _niMarker.remove();
+      _niMarker = L.marker([_niLat, _niLng]).addTo(_niMap);
+
+      document.getElementById('ni-coords').textContent =
+        `📍 ${_niLat.toFixed(6)}, ${_niLng.toFixed(6)}`;
+    });
+  }, 50);
 }
- 
+
+/* ── YN / TRIAGE / AGE / GENDER HELPERS  */
+function niSetYN(btn, field, value) {
+  Object.assign(NI_FORM, {
+    conscious: true, respiration: true, circulation: true,
+    walking: null, minor_injuries: null, triage: null, iv_access: null
+  });
+  if (NI_FORM[field] === value) {
+    NI_FORM[field] = null;
+    btn.classList.remove('active-yes', 'active-no');
+    return;
+  }
+  NI_FORM[field] = value;
+  btn.closest('div').querySelectorAll('.pca-yn-btn').forEach(b =>
+    b.classList.remove('active-yes', 'active-no'));
+  btn.classList.add(value ? 'active-yes' : 'active-no');
+}
+
+function niSetTriage(triage) {
+  NI_FORM.triage = triage;
+  document.querySelectorAll('.ni-triage-btn').forEach(b =>
+    b.classList.toggle('selected', b.dataset.triage === triage));
+}
+
+function niAdjustAge(delta) {
+  if (_niAge === null) _niAge = 30;
+  else _niAge = Math.max(0, Math.min(120, _niAge + delta));
+  document.getElementById('ni-age-display').textContent = _niAge;
+}
+
+function niSelectGender(btn, gender) {
+  _niGender = gender;
+  document.querySelectorAll('.ni-gender-btn').forEach(b => {
+    b.style.background = b.dataset.gender === gender ? 'var(--blue)' : 'var(--bg)';
+    b.style.color      = b.dataset.gender === gender ? '#fff' : 'var(--text-primary)';
+  });
+}
+
+/* ── SUBMIT  */
 async function submitNewIncident() {
   const btn   = document.getElementById('btn-submit-incident');
   const errEl = document.getElementById('ni-error');
   errEl.textContent = '';
   btn.disabled = true;
- 
+
   const params = {
-    p_event_id:           PCA.eventId,
-    p_resource_id:        document.getElementById('ni-resource').value || null,
-    p_personnel_id:       null,
-    p_incident_type:      document.getElementById('ni-type').value,
-    p_lng: null, p_lat: null,
-    p_patient_name:       document.getElementById('ni-patient-name').value.trim() || null,
-    p_patient_age:        null,
-    p_patient_gender:     null,
-    p_patient_identifier: document.getElementById('ni-patient-id').value.trim() || null,
-    p_initial_outcome:    document.getElementById('ni-outcome').value,
-    p_conscious: null, p_respiration: null, p_circulation: null,
-    p_walking: null, p_minor_injuries: null,
-    p_heart_rate: null, p_spo2: null, p_breathing_rate: null,
-    p_blood_pressure: null, p_temperature: null,
-    p_triage:             document.getElementById('ni-triage').value || null,
-    p_description:        document.getElementById('ni-description').value.trim() || null,
-    p_clinical_notes:     null,
+    p_event_id:              PCA.eventId,
+    p_resource_id:           document.getElementById('ni-resource').value || null,
+    p_reporting_resource_id: null,
+    p_personnel_id:          null,
+    p_incident_type:         null,
+    p_lng:                   _niLng,
+    p_lat:                   _niLat,
+    p_location_description:  null,
+    p_patient_name:          document.getElementById('ni-patient-name').value.trim() || null,
+    p_patient_age:           _niAge,
+    p_patient_gender:        _niGender,
+    p_patient_identifier:    document.getElementById('ni-patient-id').value.trim() || null,
+    p_initial_outcome:       document.getElementById('ni-outcome').value,
+    p_conscious:             NI_FORM.conscious,
+    p_respiration:           NI_FORM.respiration,
+    p_circulation:           NI_FORM.circulation,
+    p_walking:               NI_FORM.walking,
+    p_minor_injuries:        NI_FORM.minor_injuries,
+    p_heart_rate:            parseInt(document.getElementById('ni-heart-rate').value)     || null,
+    p_spo2:                  parseInt(document.getElementById('ni-spo2').value)           || null,
+    p_breathing_rate:        parseInt(document.getElementById('ni-breathing-rate').value) || null,
+    p_blood_pressure:        document.getElementById('ni-blood-pressure').value           || null,
+    p_temperature:           parseFloat(document.getElementById('ni-temperature').value)  || null,
+    p_triage:                NI_FORM.triage,
+    p_description:           document.getElementById('ni-description').value.trim()       || null,
+    p_clinical_notes:        null,
+    p_location_description:  document.getElementById('ni-location-desc').value.trim()    || null,
   };
- 
+
   try {
     const { error } = await db.rpc('create_incident_with_assessment', params);
     if (error) throw error;
     closeModal('modal-new-incident');
-    showToast('Intervento creato ✓', 'success');
+    // Destroy mini map
+    if (_niMap) { _niMap.remove(); _niMap = null; }
+    showPCAToast('Intervento creato ✓', 'success');
     await loadAllIncidents();
   } catch (err) {
     errEl.textContent = err.message || 'Errore nella creazione.';

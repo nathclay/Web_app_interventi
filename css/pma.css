@@ -631,10 +631,6 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); }
   color: white !important;
 }
 
-
-
-
-
 .pma-triage-btn.white  { background: #8a9ab0; color: white; }
 .pma-triage-btn.green  { background: var(--green-dim); color: #18a050; border-color: var(--green) !important; }
 .pma-triage-btn.yellow { background: #fff3cd; color: #8a6000; border-color: #f0c000 !important; }
