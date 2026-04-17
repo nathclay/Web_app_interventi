@@ -105,7 +105,7 @@ function buildPatientHTML(values = {}) {
 function buildBaseConditionsHTML(values = {}) {
   const fields = [
     { key: 'conscious',      label: 'Coscienza',       required: true },
-    { key: 'respiration',    label: 'Respiro',     required: true },
+    { key: 'respiration',    label: 'Respiro',          required: true },
     { key: 'circulation',    label: 'Circolo',          required: true },
     { key: 'walking',        label: 'Cammina',          required: false },
     { key: 'minor_injuries', label: 'Problema Minore',  required: false },

@@ -1027,10 +1027,6 @@ async function openNewIncidentModal() {
 
 /* ── YN / TRIAGE / AGE / GENDER HELPERS  */
 function niSetYN(btn, field, value) {
-  Object.assign(NI_FORM, {
-    conscious: true, respiration: true, circulation: true,
-    walking: null, minor_injuries: null, triage: null, iv_access: null
-  });
   if (NI_FORM[field] === value) {
     NI_FORM[field] = null;
     btn.classList.remove('active-yes', 'active-no');
@@ -1077,7 +1073,6 @@ async function submitNewIncident() {
     p_incident_type:         null,
     p_lng:                   _niLng,
     p_lat:                   _niLat,
-    p_location_description:  null,
     p_patient_name:          document.getElementById('ni-patient-name').value.trim() || null,
     p_patient_age:           _niAge,
     p_patient_gender:        _niGender,
@@ -1097,6 +1092,9 @@ async function submitNewIncident() {
     p_description:           document.getElementById('ni-description').value.trim()       || null,
     p_clinical_notes:        null,
     p_location_description:  document.getElementById('ni-location-desc').value.trim()    || null,
+    p_iv_access:            NI_FORM.iv_access,
+    p_gcs_total:             null,
+    p_hgt :                   null,
   };
 
   try {
@@ -1105,7 +1103,7 @@ async function submitNewIncident() {
     closeModal('modal-new-incident');
     // Destroy mini map
     if (_niMap) { _niMap.remove(); _niMap = null; }
-    showPCAToast('Intervento creato ✓', 'success');
+    showToast('Intervento creato ✓', 'success');
     await loadAllIncidents();
   } catch (err) {
     errEl.textContent = err.message || 'Errore nella creazione.';
