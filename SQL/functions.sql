@@ -23,6 +23,9 @@ CREATE OR REPLACE FUNCTION create_incident_with_assessment(
   p_breathing_rate        INTEGER,
   p_blood_pressure        TEXT,
   p_temperature           NUMERIC(4,1),
+  p_gcs_total              INTEGER,
+  p_hgt                   TEXT,
+  p_iv_access             BOOLEAN,
   p_triage                triage_enum,
   p_description           TEXT,
   p_clinical_notes        TEXT
@@ -73,7 +76,6 @@ BEGIN
 
   -- 3. Insert initial assessment
   -- Determine which response owns the assessment
-
   IF p_reporting_resource_id IS NOT NULL 
     AND p_reporting_resource_id IS DISTINCT FROM p_resource_id
     AND (p_initial_outcome = 'en_route_to_incident' OR p_resource_id IS NULL) THEN 
@@ -96,7 +98,7 @@ BEGIN
       assessed_by,
       conscious, respiration, circulation, walking, minor_injuries,
       heart_rate, spo2, breathing_rate, blood_pressure, temperature,
-      triage, description, clinical_notes,
+      triage, description, clinical_notes, iv_access, gcs_total, hgt,
       geom
     )
     VALUES (
@@ -104,7 +106,7 @@ BEGIN
       p_personnel_id,
       p_conscious, p_respiration, p_circulation, p_walking, p_minor_injuries,
       p_heart_rate, p_spo2, p_breathing_rate, p_blood_pressure, p_temperature,
-      p_triage, p_description, p_clinical_notes,
+      p_triage, p_description, p_clinical_notes, p_iv_access, p_gcs_total, p_hgt,
       v_geom
     );
   END IF;

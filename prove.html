@@ -1,0 +1,693 @@
+<div class="modal-backdrop" id="modal-incident">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <span class="modal-title">Nuovo Intervento</span>
+      <button class="modal-close" id="modal-incident-close">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- 1. CONDIZIONI DI BASE — always shown -->
+      <div class="form-section">
+        <div class="form-section-title">Condizioni di base</div>
+        <div class="yn-field">
+          <div class="yn-label">Coscienza <span class="required">*</span></div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no"  data-field="conscious" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="conscious" data-value="true">Sì</button>
+          </div>
+        </div>
+        <div class="yn-field">
+          <div class="yn-label">Respirazione <span class="required">*</span></div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no"  data-field="respiration" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="respiration" data-value="true">Sì</button>
+          </div>
+        </div>
+        <div class="yn-field">
+          <div class="yn-label">Circolo <span class="required">*</span></div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no"  data-field="circulation" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="circulation" data-value="true">Sì</button>
+          </div>
+        </div>
+        <div class="yn-field">
+          <div class="yn-label">Cammina <span class="required">*</span></div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no"  data-field="walking" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="walking" data-value="true">Sì</button>
+          </div>
+        </div>
+      <div class="yn-field" style="border-bottom:none;">
+          <div class="yn-label">Problema Minore <span class="required">*</span></div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no"  data-field="minor_injuries" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="minor_injuries" data-value="true">Sì</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. DESCRIZIONE — always shown -->
+      <div class="form-section">
+        <div class="form-section-title">Descrizione <span class="required">*</span></div>
+        <textarea id="f-description" rows="3"
+          placeholder="Descrizione dell'intervento..."></textarea>
+      </div>
+
+      <!-- 3. PAZIENTE — always shown -->
+      <div class="form-section">
+        <div class="form-section-title">Paziente</div>
+        <div class="form-row" style="margin-bottom:10px;">
+          <div class="input-group">
+            <label>Nome - Cognome</label>
+            <input type="text" id="f-patient-name" placeholder="—" />
+          </div>
+          <div class="input-group">
+            <label>Pettorale</label>
+            <input type="text" id="f-patient-id" placeholder="-" />
+          </div>
+        </div>
+        <div class="form-row" style="margin-bottom:10px;">
+          <div class="input-group" style = "flex:1;">
+            <label>Età apparente</label>
+            <div class="age-stepper">
+              <input type="number" id="f-patient-age" class="age-input"
+                    value="" min="0" max="120" />
+              <div class="age-arrows">
+                <button class="age-btn" id="age-up" type="button">▲</button>
+                <button class="age-btn" id="age-down" type="button">▼</button>
+              </div>
+            </div>
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>Sesso</label>
+            <div class="seg-buttons" id="f-patient-gender-btns">
+              <button class="seg-btn" data-value="M">M</button>
+              <button class="seg-btn" data-value="F">F</button>
+              <button class="seg-btn" data-value="altro">Altro</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. VALUTAZIONE CLINICA — ASM, ASI, MM only (shown/hidden by JS) -->
+      <div class="form-section clinical-only" id="section-clinical" style="display:none;">
+        <div class="form-section-title">Valutazione clinica</div>
+
+        <div class="input-group" style="margin-bottom:10px;">
+          <label>Triage</label>
+          <div class="triage-selector">
+            <button class="triage-btn white"  data-triage="white">⚪ Bianco</button>
+            <button class="triage-btn green"  data-triage="green">🟢 Verde</button>
+            <button class="triage-btn yellow" data-triage="yellow">🟡 Giallo</button>
+            <button class="triage-btn red"    data-triage="red">🔴 Rosso</button>
+          </div>
+        </div>
+
+        <div class="form-row" style="margin-bottom:10px;">
+          <div class="input-group" style="flex:1;">
+            <label>FC</label>
+            <input type="number" id="f-heart-rate" placeholder="—" min="0" max="300" />
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>SpO2</label>
+            <input type="number" id="f-spo2" placeholder="—" min="0" max="100" />
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>FR</label>
+            <input type="number" id="f-breathing-rate" placeholder="—" min="0" max="35" />
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>PA</label>
+            <input type="text" id="f-blood-pressure" placeholder="—" />
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>Temp</label>
+            <input type="number" id="f-temperature" placeholder="—" step="0.1" />
+          </div>
+        </div>
+        <div class="yn-field" style="border-bottom:none;">
+          <div class="yn-label">Accesso venoso</div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no"  data-field="iv_access" data-value="false">No</button>
+            <button class="yn-btn yn-yes" data-field="iv_access" data-value="true">Sì</button>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Note cliniche</label>
+          <textarea id="f-clinical-notes" rows="2" placeholder="Osservazioni, sintomi..."></textarea>
+        </div>
+      </div>
+
+      <!-- 5. ORARIO ALLERTAMENTO — always shown -->
+      <div class="form-section">
+        <div class="form-section-title">Orario allertamento <span class="required">*</span></div>
+        <input type="datetime-local" id="f-alert-time" />
+      </div>
+
+      <!-- 6. POSIZIONE — always shown -->
+      <div class="form-section">
+        <div class="form-section-title">Posizione</div>
+        <button class="btn-get-location" id="btn-get-location" type="button">
+          📍 Usa posizione attuale
+        </button>
+        <div id="location-display" class="location-display" style="display:none;">
+          <span id="location-coords"></span>
+          <span id="location-accuracy"></span>
+        </div>
+        <div id="location-map-container" style="display:none;margin-top:8px;border-radius:var(--radius);overflow:hidden;">
+          <iframe id="location-map-img"
+            style="width:100%;height:180px;border:none;display:block;"
+            src="">
+          </iframe>
+        </div>
+      </div>
+
+      <!-- 7. STATO — always shown -->
+      <div class="form-section">
+        <div class="form-section-title">Stato attuale</div>
+        <div class="status-selector">
+          <div class="status-option selected" id="status-opt-active">
+            <span class="status-option-icon">🚨</span>
+            <div>
+              <div style="font-weight:bold;">In corso</div>
+              <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">
+                Sto ancora trattando il paziente
+              </div>
+            </div>
+          </div>
+          <div class="status-option" id="status-opt-resolved">
+            <span class="status-option-icon">✅</span>
+            <div>
+              <div style="font-weight:bold;">Già risolto</div>
+              <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">
+                Intervento concluso — seleziona esito
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Outcome panel — injected by JS when risolto selected -->
+        <div id="form-outcome-panel"></div>
+      </div>
+
+      <button class="btn-submit-incident" id="btn-submit-incident">
+        Registra Intervento
+      </button>
+
+    </div>
+  </div>
+</div>
+<!-- ============================================================
+  MODAL — AGGIUNGI VALUTAZIONE
+============================================================ -->
+<div class="modal-backdrop" id="modal-assessment">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <span class="modal-title">Nuova Valutazione</span>
+      <button class="modal-close" id="modal-assessment-close">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- CONDIZIONI DI BASE -->
+      <div class="form-section">
+        <div class="form-section-title">Condizioni di base</div>
+        <div class="yn-field">
+          <div class="yn-label">Coscienza <span class="required">*</span></div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no"  data-field="conscious" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="conscious" data-value="true">Sì</button>
+          </div>
+        </div>
+        <div class="yn-field">
+          <div class="yn-label">Respirazione <span class="required">*</span></div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no"  data-field="respiration" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="respiration" data-value="true">Sì</button>
+          </div>
+        </div>
+        <div class="yn-field">
+          <div class="yn-label">Circolo <span class="required">*</span></div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no"  data-field="circulation" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="circulation" data-value="true">Sì</button>
+          </div>
+        </div>
+        <div class="yn-field">
+          <div class="yn-label">Cammina <span class="required">*</span></div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no"  data-field="walking" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="walking" data-value="true">Sì</button>
+          </div>
+        </div>
+        <div class="yn-field" style="border-bottom:none;">
+          <div class="yn-label">Problema Minore <span class="required">*</span></div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no"  data-field="minor_injuries" data-value="false">No / Non so</button>
+            <button class="yn-btn yn-yes" data-field="minor_injuries" data-value="true">Sì</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DESCRIZIONE -->
+      <div class="form-section">
+        <div class="form-section-title">Descrizione<span class="required">*</span></div>
+        <textarea id="a-description" rows="3"
+          placeholder="Aggiornamento sulla situazione..."></textarea>
+      </div>
+      <!-- VALUTAZIONE CLINICA — ASM, ASI, MM only -->
+      <div class="form-section" id="a-section-clinical" style="display:none;">
+        <div class="form-section-title">Valutazione clinica</div>
+        <div class="input-group" style="margin-bottom:10px;">
+          <label>Triage</label>
+          <div class="triage-selector">
+            <button class="triage-btn white"  data-triage="white"  data-form="assessment">⚪ Bianco</button>
+            <button class="triage-btn green"  data-triage="green"  data-form="assessment">🟢 Verde</button>
+            <button class="triage-btn yellow" data-triage="yellow" data-form="assessment">🟡 Giallo</button>
+            <button class="triage-btn red"    data-triage="red"    data-form="assessment">🔴 Rosso</button>
+          </div>
+        </div>
+        <div class="form-row" style="margin-bottom:10px;">
+          <div class="input-group" style="flex:1;">
+            <label>FC</label>
+            <input type="number" id="a-heart-rate" placeholder="—" min="0" max="300" />
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>SpO2</label>
+            <input type="number" id="a-spo2" placeholder="—" min="0" max="100" />
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>FR</label>
+            <input type="number" id="a-breathing-rate" placeholder="—" min="0" max="35" />
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>PA</label>
+            <input type="text" id="a-blood-pressure" placeholder="—" />
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>Temp</label>
+            <input type="number" id="a-temperature" placeholder="—" step="0.1" />
+          </div>
+        </div>
+        <div class="yn-field" style="border-bottom:none;">
+          <div class="yn-label">Accesso venoso</div>
+          <div class="yn-buttons">
+            <button class="yn-btn yn-no"  data-field="iv_access" data-value="false">No</button>
+            <button class="yn-btn yn-yes" data-field="iv_access" data-value="true">Sì</button>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Note cliniche</label>
+          <textarea id="a-clinical-notes" rows="2" placeholder="Osservazioni..."></textarea>
+        </div>
+      </div>
+
+      <button class="btn-submit-incident" id="btn-submit-assessment">
+        Salva Valutazione
+      </button>
+
+    </div>
+  </div>
+</div>
+
+
+
+
+/*
+function initIncidentForm() {
+  document.getElementById('btn-open-incident-form')
+    .addEventListener('click', openIncidentForm);
+  document.getElementById('modal-incident-close')
+    .addEventListener('click', () => closeModal('modal-incident'));
+  document.getElementById('modal-detail-close')
+    .addEventListener('click', () => closeModal('modal-detail'));
+  document.querySelectorAll('.modal-backdrop').forEach(b => {
+    b.addEventListener('click', e => { if (e.target === b) closeModal(b.id); });
+  });
+  document.getElementById('btn-submit-incident')
+    .addEventListener('click', submitIncident);
+  document.getElementById('age-up')?.addEventListener('click', () => {
+    const input = document.getElementById('f-patient-age');
+    const current = input.value === '' ? 40 : parseInt(input.value);
+    input.value   = Math.min(current + 10, 120);
+
+  });
+
+  document.getElementById('age-down')?.addEventListener('click', () => {
+    const input = document.getElementById('f-patient-age');
+    const current = input.value === '' ? 60 : parseInt(input.value);
+    input.value   = Math.max(current - 10, 0);
+  });
+
+  // Y/N buttons — main incident form
+  document.querySelectorAll('#modal-incident .yn-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const field = btn.dataset.field;
+      const value = btn.dataset.value === 'true';
+      if (btn.classList.contains('active')) {
+        STATE.formData[field] = null;
+        btn.classList.remove('active');
+      } else {
+        STATE.formData[field] = value;
+        btn.closest('.yn-buttons').querySelectorAll('.yn-btn')
+          .forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      }
+      if (['conscious', 'respiration', 'circulation'].includes(field) && value === false) {
+        setAssessmentYN('walking', false);
+        setAssessmentYN('minor_injuries', false);
+      }
+    });
+  });
+
+  // Y/N buttons — assessment modal
+  document.querySelectorAll('#modal-assessment .yn-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const field      = btn.dataset.field;
+      const value      = btn.dataset.value === 'true';
+      if (btn.classList.contains('active')) {
+        STATE.assessmentData[field] = null;
+        btn.classList.remove('active');
+      } else {
+        STATE.assessmentData[field] = value;
+        btn.closest('.yn-buttons').querySelectorAll('.yn-btn')
+          .forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      }
+
+      if (['conscious', 'respiration', 'circulation'].includes(field) && value === false) {
+        setAssessmentYN('walking', false);
+        setAssessmentYN('minor_injuries', false);
+      }
+    });
+  });
+
+  // Triage — main form
+  document.querySelectorAll('#modal-incident .triage-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#modal-incident .triage-btn')
+        .forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      STATE.formData.triage = btn.dataset.triage;
+    });
+  });
+
+  // Triage — assessment modal
+  document.querySelectorAll('#modal-assessment .triage-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#modal-assessment .triage-btn')
+        .forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      STATE.assessmentData.triage = btn.dataset.triage;
+    });
+  });
+
+  // Gender
+  document.querySelectorAll('.seg-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      STATE.formData.gender = btn.dataset.value;
+    });
+  });
+
+  // Status
+  document.getElementById('status-opt-active')
+    ?.addEventListener('click', () => selectFormStatus('in_progress'));
+  document.getElementById('status-opt-resolved')
+    ?.addEventListener('click', () => selectFormStatus('resolved'));
+
+  // Location
+  document.getElementById('btn-get-location')
+    ?.addEventListener('click', async () => {
+      const btn = document.getElementById('btn-get-location');
+      btn.textContent = '📍 Localizzazione...';
+      try {
+        const pos = await getCurrentPosition();
+        STATE.formData.lat = pos.coords.latitude;
+        STATE.formData.lng = pos.coords.longitude;
+        const lat = pos.coords.latitude.toFixed(5);
+        const lng = pos.coords.longitude.toFixed(5);
+        document.getElementById('location-coords').textContent = `${lat}, ${lng}`;
+        document.getElementById('location-accuracy').textContent =
+          `Accuratezza: ±${Math.round(pos.coords.accuracy)}m`;
+        document.getElementById('location-display').style.display = 'flex';
+        btn.textContent = '📍 Aggiorna posizione';
+        btn.classList.add('got');
+        // Static map
+        document.getElementById('location-map-img').src =
+          `https://www.openstreetmap.org/export/embed.html?bbox=${parseFloat(lng)-0.002},${parseFloat(lat)-0.002},${parseFloat(lng)+0.002},${parseFloat(lat)+0.002}&layer=mapnik&marker=${lat},${lng}`;
+        document.getElementById('location-map-container').style.display = 'block';
+      } catch (_) {
+        btn.textContent = '📍 Usa posizione attuale';
+        showToast('Impossibile ottenere la posizione', 'error');
+      }
+    });
+}*/
+
+/*
+async function selectFormStatus(status) {
+  STATE.formData.status     = status;
+  STATE.formData.outcomeType = null;
+  document.getElementById('status-opt-active')
+    ?.classList.toggle('selected', status === 'in_progress');
+  document.getElementById('status-opt-resolved')
+    ?.classList.toggle('selected', status === 'resolved');
+  const panel = document.getElementById('form-outcome-panel');
+  if (!panel) return;
+  if (status === 'resolved') {
+    panel.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--text-secondary);">Caricamento...</div>';
+    panel.innerHTML = await buildOutcomePanelHTML();
+    initOutcomePanel(panel);
+  } else {
+    panel.innerHTML = '';
+  }
+}*/
+
+/*
+async function buildOutcomePanelHTML() {
+  const allResources  = await fetchEventResources();
+  const pmaResources  = allResources.filter(r => r.resource_type === 'PMA');
+  const teamResources = allResources.filter(r => !['PMA','LDC', 'PCA'].includes(r.resource_type));
+
+  const pmaOptions  = pmaResources.map(r =>
+    `<option value="${r.id}">${r.resource}</option>`).join('');
+  const teamOptions = teamResources.map(r =>
+    `<option value="${r.id}">${r.resource} (${r.resource_type})</option>`).join('');
+  const isClinical = CLINICAL_TYPES.includes(STATE.resource.resource_type);
+
+  return `
+  <div class="outcome-panel">
+    <div class="outcome-opt" data-outcome-type="treated_and_released">
+      <span>✔</span> Trattato e dimesso
+    </div>
+
+    <div class="outcome-opt" data-outcome-type="consegnato_squadra">
+      <span>🤝</span> Consegnato ad altra squadra
+    </div>
+    <div class="outcome-detail" id="od-squadra" style="display:none;">
+      <div class="outcome-detail-label">Quale squadra?</div>
+      <select id="od-squadra-select">
+        <option value="">— Seleziona —</option>${teamOptions}
+      </select>
+    </div>
+
+    <div class="outcome-opt" data-outcome-type="trasportato_pma">
+      <span>🏥</span> Trasportato al PMA 
+    </div>
+    <div class="outcome-detail" id="od-pma" style="display:none;">
+      <div class="outcome-detail-label">Quale PMA?<span class="required">*</span></div>
+      <select id="od-pma-select">
+        <option value="">— Seleziona —</option>${pmaOptions}
+      </select>
+    </div>
+
+    ${isClinical ? `
+    <div class="outcome-opt" data-outcome-type="ospedalizzato">
+      <span>🚑</span> Ospedalizzato
+    </div>
+    <div class="outcome-detail" id="od-ospedale" style="display:none;">
+      <div class="outcome-detail-label">Ospedale <span class="required">*</span></div>
+      <input type="text" id="od-ospedale-name" placeholder="Nome ospedale..." />
+      <div class="outcome-detail-label" style="margin-top:6px;">Codice GIPSE <span class="required">*</span></div>
+      <input type="text" id="od-gipse" placeholder="Codice GIPSE..." />
+    </div>
+    ` : ''}
+
+    <div class="outcome-opt" data-outcome-type="consegnato_118">
+      <span>🚨</span> Consegnato al 118
+    </div>
+
+    <div class="outcome-opt" data-outcome-type="rifiuta_trasporto">
+      <span>🚶</span> Rifiuta il trasporto
+    </div>
+
+    <div class="outcome-opt" data-outcome-type="annullato">
+      <span>✕</span> Annullato / Falso allarme
+    </div>
+  </div>`;
+}*/
+
+/*
+function openIncidentForm() {
+  resetIncidentForm();
+
+  // Y/N buttons default to Sì
+  ['conscious', 'respiration', 'circulation'].forEach(field => {
+    STATE.formData[field] = true;
+    const btn = document.querySelector(`.yn-btn.yn-yes[data-field="${field}"]`);
+    if (btn) btn.classList.add('active');
+  });
+
+  // Age
+  const age = document.getElementById('f-patient-age');
+  if (age) age.value = '';
+
+  // Clinical section visibility
+  const clinical = document.getElementById('section-clinical');
+  if (clinical) {
+    clinical.style.display =
+      CLINICAL_TYPES.includes(STATE.resource.resource_type) ? 'block' : 'none';
+  }
+
+  // Alert time default now
+  const timeInput = document.getElementById('f-alert-time');
+  if (timeInput) {
+    const now   = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+      .toISOString().slice(0, 16);
+    timeInput.value = local;
+  }
+  openModal('modal-incident');
+
+   // Auto-fetch location
+  const locBtn = document.getElementById('btn-get-location');
+  locBtn.textContent = '📍 Localizzazione...';
+  getCurrentPosition()
+    .then(pos => {
+      STATE.formData.lat = pos.coords.latitude;
+      STATE.formData.lng = pos.coords.longitude;
+      const lat = pos.coords.latitude.toFixed(5);
+      const lng = pos.coords.longitude.toFixed(5);
+      document.getElementById('location-coords').textContent = `${lat}, ${lng}`;
+      document.getElementById('location-accuracy').textContent =
+        `Accuratezza: ±${Math.round(pos.coords.accuracy)}m`;
+      document.getElementById('location-display').style.display = 'flex';
+
+      // Static map image
+      const mapImg = document.getElementById('location-map-img');
+      const mapContainer = document.getElementById('location-map-container');
+      mapImg.src = `https://www.openstreetmap.org/export/embed.html?bbox=${parseFloat(lng)-0.002},${parseFloat(lat)-0.002},${parseFloat(lng)+0.002},${parseFloat(lat)+0.002}&layer=mapnik&marker=${lat},${lng}`;
+      mapContainer.style.display = 'block';
+
+      locBtn.textContent = '📍 Aggiorna posizione';
+      locBtn.classList.add('got');
+    })
+    .catch(() => {
+      locBtn.textContent = '📍 Usa posizione attuale';
+      showToast('GPS non disponibile — premi il pulsante per riprovare', 'error', 4000);
+    });
+}
+
+function resetIncidentForm() {
+  STATE.formData = {
+    triage: null, conscious: null, respiration: null,
+    circulation: null, walking: null, minor_injuries: null, gender: null,
+    status: 'in_progress', outcomeType: null, lat: null, lng: null,
+  };
+  document.querySelectorAll('.yn-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.triage-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+  ['f-patient-name','f-patient-id','f-clinical-notes','f-description',
+   'f-heart-rate','f-spo2','f-breathing-rate', 'f-blood-pressure', 'f-temperature'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const age = document.getElementById('f-patient-age');
+  if (age) age.value = '';
+ 
+
+  const incType = document.getElementById('f-incident-type');
+  if (incType) incType.value = 'medical';
+  document.getElementById('status-opt-active')?.classList.add('selected');
+  document.getElementById('status-opt-resolved')?.classList.remove('selected');
+  const panel = document.getElementById('form-outcome-panel');
+  if (panel) panel.innerHTML = '';
+  const locDisplay = document.getElementById('location-display');
+  if (locDisplay) locDisplay.style.display = 'none';
+  const locBtn = document.getElementById('btn-get-location');
+  if (locBtn) { locBtn.classList.remove('got'); locBtn.textContent = '📍 Usa posizione attuale'; }
+}
+*/
+
+/*
+function openAssessmentForm(incidentId, previous = null) {
+  // Reset assessment form state
+  STATE.assessmentData = {
+    conscious: null, respiration: null,
+    circulation: null, walking: null, triage: null
+  };
+
+  document.querySelectorAll('#modal-assessment .yn-btn')
+    .forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#modal-assessment .triage-btn')
+    .forEach(b => b.classList.remove('selected'));
+  ['a-heart-rate','a-spo2','a-breathing-rate', 'a-blood-pressure','a-breathing-rate','a-description', 'a-clinical-notes'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+   // ── Pre-fill from previous assessment if available, else defaults ──
+  const src = previous || {
+    conscious: true, respiration: true, circulation: true, walking: null, minor_injuries: null,
+    triage: null, heart_rate: null, spo2: null, breathing_rate: null, blood_pressure: null, temperature: null, description: null, clinical_notes: null, iv_access:null
+  };
+
+  // Y/N fields
+  ['conscious', 'respiration', 'circulation', 'walking', 'minor_injuries'].forEach(field => {
+    const value = src[field];
+    if (value === null || value === undefined) return;
+    STATE.assessmentData[field] = value;
+    const btn = document.querySelector(
+      `#modal-assessment .yn-btn[data-field="${field}"][data-value="${value}"]`
+    );
+
+    if (btn) btn.classList.add('active');
+  });
+  
+  if (src.heart_rate)    document.getElementById('a-heart-rate').value    = src.heart_rate;
+  if (src.spo2)          document.getElementById('a-spo2').value          = src.spo2;
+  if (src.gcs_total)     document.getElementById('a-gcs').value           = src.gcs_total;
+  if (src.breathing_rate) document.getElementById('a-breathing-rate').value = src.breathing_rate;
+  if (src.blood_pressure) document.getElementById('a-blood-pressure').value = src.blood_pressure;
+  if (src.temperature)    document.getElementById('a-temperature').value   = src.temperature;
+  if (src.description)    document.getElementById('a-description').value    = src.description;
+  if (src.iv_access !== null && src.iv_access !== undefined) {
+    const btn = document.querySelector(
+      `#modal-assessment .yn-btn[data-field="iv_access"][data-value="${src.iv_access}"]`
+    );
+    if (btn) btn.classList.add('active');
+  }
+  // Triage
+  if (src.triage) {
+    STATE.assessmentData.triage = src.triage;
+    const triageBtn = document.querySelector(
+      `#modal-assessment .triage-btn[data-triage="${src.triage}"]`
+    );
+    if (triageBtn) triageBtn.classList.add('selected');
+  }
+
+  // Clinical section visibility
+  const clinical = document.getElementById('a-section-clinical');
+  if (clinical) {
+    clinical.style.display =
+      CLINICAL_TYPES.includes(STATE.resource.resource_type) ? 'block' : 'none';
+  }
+
+  const btn = document.getElementById('btn-submit-assessment');
+  btn.onclick = () => submitAssessment(incidentId);
+  document.getElementById('modal-assessment-close').onclick =
+    () => closeModal('modal-assessment');
+
+  openModal('modal-assessment');
+}*/

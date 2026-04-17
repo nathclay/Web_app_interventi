@@ -111,8 +111,8 @@ async function fetchIncidentDetail(incidentId) {
       ),
       patient_assessments(
         id, assessed_at, response_id, conscious, respiration, circulation,
-        walking, minor_injuries, heart_rate, spo2, breathing_rate, gcs_total,
-        triage, description, clinical_notes, blood_pressure, temperature
+        walking, minor_injuries, heart_rate, spo2, breathing_rate, gcs_total, hgt,
+        triage, description, clinical_notes, blood_pressure, temperature, iv_access
       )
     `)
     .eq('id', incidentId)

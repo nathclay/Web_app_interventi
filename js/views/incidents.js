@@ -4,7 +4,14 @@
    Depends on: rpc.js, ui.js, state.js, location.js
 ================================================================ */
 
-// Helper: programmatically set a Y/N field to a value
+/* ================================================================
+   HELPERS AND LABELS
+   setYNField / setAssessmentYN: programmatically set a Y/N button
+   to active and update the corresponding state object.
+   Used by the cascade logic (e.g. conscious=false → walking=false).
+   Label maps: human-readable strings for incident types and statuses.
+   CLINICAL_TYPES: resource types that show the clinical section (ASM/ASI/MM)
+================================================================ */
 function setYNField(field, value) {
   STATE.formData[field] = value;
   const container = document.querySelector(`.yn-btn[data-field="${field}"]`)
@@ -25,10 +32,6 @@ function setAssessmentYN(field, value) {
   if (target) target.classList.add('active');
 }
 
-
-/* ----------------------------------------------------------------
-   LABELS
----------------------------------------------------------------- */
 const INCIDENT_TYPE_LABELS = {
   medical:       'Medico',
   trauma:        'Trauma',
@@ -47,13 +50,290 @@ const STATUS_LABELS = {
   cancelled:         'Annullato',
 };
 
-
-// Resource types that show the clinical section
 const CLINICAL_TYPES = ['ASM', 'ASI', 'MM'];
 
-/* ----------------------------------------------------------------
+/* ================================================================
+   SHARED HTML BUILDERS
+   Pure functions — return HTML strings, no DOM side effects.
+   Each builder corresponds to a form section reused across modals.
+   buildPatientHTML(values)         — nome, pettorale, età, sesso
+   buildBaseConditionsHTML(values)  — 5 Y/N vitals + descrizione
+   buildClinicalHTML(values)        — triage, vitals, iv_access, note
+   buildLocationTimeHTML()          — orario allertamento + GPS + map
+   buildOutcomeOptionsHTML(...)     — closing outcome selector list
+================================================================ */
+
+function buildPatientHTML(values = {}) {
+  const { name = '', identifier = '', age = '', gender = null } = values;
+  return `
+    <div class="form-section">
+      <div class="form-section-title">Paziente</div>
+      <div class="form-row" style="margin-bottom:10px;">
+        <div class="input-group">
+          <label>Nome - Cognome</label>
+          <input type="text" id="f-patient-name" placeholder="—" value="${name}" />
+        </div>
+        <div class="input-group">
+          <label>Pettorale</label>
+          <input type="text" id="f-patient-id" placeholder="—" value="${identifier}" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="input-group" style="flex:1;">
+          <label>Età apparente</label>
+          <div class="age-stepper">
+            <input type="number" id="f-patient-age" class="age-input"
+              value="${age}" min="0" max="120" />
+            <div class="age-arrows">
+              <button class="age-btn" id="age-up" type="button">▲</button>
+              <button class="age-btn" id="age-down" type="button">▼</button>
+            </div>
+          </div>
+        </div>
+        <div class="input-group" style="flex:1;">
+          <label>Sesso</label>
+          <div class="seg-buttons" id="f-patient-gender-btns">
+            <button class="seg-btn ${gender === 'M'     ? 'active' : ''}" data-value="M">M</button>
+            <button class="seg-btn ${gender === 'F'     ? 'active' : ''}" data-value="F">F</button>
+            <button class="seg-btn ${gender === 'altro' ? 'active' : ''}" data-value="altro">Altro</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function buildBaseConditionsHTML(values = {}) {
+  const fields = [
+    { key: 'conscious',      label: 'Coscienza',       required: true },
+    { key: 'respiration',    label: 'Respiro',     required: true },
+    { key: 'circulation',    label: 'Circolo',          required: true },
+    { key: 'walking',        label: 'Cammina',          required: false },
+    { key: 'minor_injuries', label: 'Problema Minore',  required: false },
+  ];
+  const ynRows = fields.map((f, i) => {
+    const isLast = i === fields.length - 1;
+    const val = values[f.key];
+    return `
+      <div class="yn-field" ${isLast ? 'style="border-bottom:none;"' : ''}>
+        <div class="yn-label">${f.label} ${f.required ? '<span class="required">*</span>' : ''}</div>
+        <div class="yn-buttons">
+          <button class="yn-btn yn-no  ${val === false ? 'active' : ''}"
+            data-field="${f.key}" data-value="false">No / Non so</button>
+          <button class="yn-btn yn-yes ${val === true  ? 'active' : ''}"
+            data-field="${f.key}" data-value="true">Sì</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="form-section">
+      <div class="form-section-title">Condizioni di base</div>
+      ${ynRows}
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Descrizione <span class="required">*</span></div>
+      <textarea id="f-description" rows="3"
+        placeholder="Descrizione dell'intervento...">${values.description || ''}</textarea>
+    </div>`;
+}
+
+function buildClinicalHTML(values = {}, isAssessment = false) {
+  const triage = values.triage || null;
+  const triageColors = { white: '⚪', green: '🟢', yellow: '🟡', red: '🔴' };
+  const triageLabels = { white: 'Bianco', green: 'Verde', yellow: 'Giallo', red: 'Rosso' };
+
+  return `
+    <div class="form-section" id="section-clinical">
+      <div class="form-section-title">Valutazione clinica</div>
+      <div class="input-group" style="margin-bottom:10px;">
+        <label>Triage <span class="required">*</span></label>
+        <div class="triage-selector">
+          ${['white','green','yellow','red'].map(t => `
+            <button class="triage-btn ${t} ${triage === t ? 'selected' : ''}"
+              data-triage="${t}">
+              ${triageColors[t]} ${triageLabels[t]}
+            </button>`).join('')}
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:10px;">
+        <div class="input-group" style="flex:1;">
+          <label>FR</label>
+          <input type="number" id="f-breathing-rate" placeholder="—" min="0" max="300"
+            value="${values.breathing_rate || ''}" />
+        </div>
+        <div class="input-group" style="flex:1;">
+          <label>SpO2</label>
+          <input type="number" id="f-spo2" placeholder="—" min="0" max="100"
+            value="${values.spo2 || ''}" />
+        </div>
+        <div class="input-group" style="flex:1;">
+          <label>FC</label>
+          <input type="number" id="f-heart-rate" placeholder="—" min="0" max="60"
+            value="${values.heart_rate || ''}" />
+        </div>
+        <div class="input-group" style="flex:1;">
+          <label>PA</label>
+          <input type="text" id="f-blood-pressure" placeholder="—"
+            value="${values.blood_pressure || ''}" />
+        </div>
+      </div>
+      ${isAssessment ? `
+      <div class="form-row" style="margin-bottom:10px;">
+        <div class="input-group" style="flex:1;">
+          <label>Temp</label>
+          <input type="number" id="f-temperature" placeholder="—" step="0.1"
+            value="${values.temperature || ''}" />
+        </div>
+        <div class="input-group" style="flex:1;">
+          <label>GCS</label>
+          <input type="number" id="f-gcs" placeholder="—" min="3" max="15"
+            value="${values.gcs_total || ''}" />
+        </div>
+        <div class="input-group" style="flex:1;">
+          <label>HGT</label>
+          <input type="text" id="f-hgt" placeholder="—"
+            value="${values.hgt || ''}" />
+        </div>
+      </div>
+      <div class="yn-field" style="border-bottom:none;">
+        <div class="yn-label">Accesso venoso</div>
+        <div class="yn-buttons">
+          <button class="yn-btn yn-no  ${values.iv_access === false ? 'active' : ''}"
+            data-field="iv_access" data-value="false">No</button>
+          <button class="yn-btn yn-yes ${values.iv_access === true  ? 'active' : ''}"
+            data-field="iv_access" data-value="true">Sì</button>
+        </div>
+      </div>` : ''}
+      <div class="input-group" style="margin-top:10px;">
+        <label>Note cliniche</label>
+        <textarea id="f-clinical-notes" rows="2"
+          placeholder="Osservazioni, sintomi...">${values.clinical_notes || ''}</textarea>
+      </div>
+    </div>`;
+}
+
+function buildLocationTimeHTML() {
+  const now   = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+    .toISOString().slice(0, 16);
+  return `
+    <div class="form-section">
+      <div class="form-section-title">Orario allertamento <span class="required">*</span></div>
+      <input type="datetime-local" id="f-alert-time" value="${local}" />
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Posizione</div>
+      <button class="btn-get-location" id="btn-get-location" type="button">
+        📍 Usa posizione attuale
+      </button>
+      <div id="location-display" class="location-display" style="display:none;">
+        <span id="location-coords"></span>
+        <span id="location-accuracy"></span>
+      </div>
+      <div id="location-map-container"
+        style="display:none;margin-top:8px;border-radius:var(--radius);overflow:hidden;">
+        <iframe id="location-map-img"
+          style="width:100%;height:180px;border:none;display:block;" src="">
+        </iframe>
+      </div>
+    </div>`;
+}
+
+function buildOutcomeOptionsHTML(pmaOptions, teamOptions, isClinical) {
+  return `
+    <div class="outcome-panel">
+      <div class="outcome-opt" data-outcome-type="treated_and_released">
+        <span>✔</span> Trattato e dimesso
+      </div>
+      <div class="outcome-opt" data-outcome-type="consegnato_squadra">
+        <span>🤝</span> Consegnato ad altra squadra
+      </div>
+      <div class="outcome-detail" id="od-squadra" style="display:none;">
+        <div class="outcome-detail-label">Quale squadra? <span class="required">*</span></div>
+        <select id="od-squadra-select">
+          <option value="">— Seleziona —</option>${teamOptions}
+        </select>
+      </div>
+      <div class="outcome-opt" data-outcome-type="trasportato_pma">
+        <span>🏥</span> Trasportato al PMA
+      </div>
+      <div class="outcome-detail" id="od-pma" style="display:none;">
+        <div class="outcome-detail-label">Quale PMA? <span class="required">*</span></div>
+        <select id="od-pma-select">
+          <option value="">— Seleziona —</option>${pmaOptions}
+        </select>
+      </div>
+      ${isClinical ? `
+      <div class="outcome-opt" data-outcome-type="ospedalizzato">
+        <span>🚑</span> Ospedalizzato
+      </div>
+      <div class="outcome-detail" id="od-ospedale" style="display:none;">
+        <div class="outcome-detail-label">Ospedale <span class="required">*</span></div>
+        <input type="text" id="od-ospedale-name" placeholder="Nome ospedale..." />
+        <div class="outcome-detail-label" style="margin-top:6px;">Codice GIPSE <span class="required">*</span></div>
+        <input type="text" id="od-gipse" placeholder="Codice GIPSE..." />
+      </div>` : ''}
+      <div class="outcome-opt" data-outcome-type="consegnato_118">
+        <span>🚨</span> Consegnato al 118
+      </div>
+      <div class="outcome-opt" data-outcome-type="rifiuta_trasporto">
+        <span>🚶</span> Rifiuta il trasporto
+      </div>
+      <div class="outcome-opt" data-outcome-type="annullato">
+        <span>✕</span> Annullato / Falso allarme
+      </div>
+    </div>`;
+}
+
+function wireYNButtons(container, stateObj, cascadeFields = []) {
+  container.querySelectorAll('.yn-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const field = btn.dataset.field;
+      const value = btn.dataset.value === 'true';
+      const isAlreadyActive = btn.classList.contains('active');
+
+      btn.closest('.yn-buttons').querySelectorAll('.yn-btn')
+        .forEach(b => b.classList.remove('active'));
+
+      if (isAlreadyActive) {
+        stateObj[field] = null;
+      } else {
+        btn.classList.add('active');
+        if (field in stateObj) stateObj[field] = value;
+        if (cascadeFields.includes(field) && value === false) {
+          // set walking and minor_injuries to false in the same container
+          container.querySelectorAll('.yn-btn[data-field="walking"], .yn-btn[data-field="minor_injuries"]')
+            .forEach(b => b.classList.remove('active'));
+          container.querySelector('.yn-btn[data-field="walking"][data-value="false"]')
+            ?.classList.add('active');
+          container.querySelector('.yn-btn[data-field="minor_injuries"][data-value="false"]')
+            ?.classList.add('active');
+          stateObj['walking'] = false;
+          stateObj['minor_injuries'] = false;
+        }
+      }
+    });
+  });
+}
+
+function wireTriageButtons(container, stateObj) {
+  container.querySelectorAll('.triage-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      container.querySelectorAll('.triage-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      stateObj.triage = btn.dataset.triage;
+    });
+  });
+}
+/* ================================================================
    LOAD & RENDER INCIDENTS
----------------------------------------------------------------- */
+   loadIncidents()       — fetches from DB into STATE.incidents, then renders
+   renderIncidents()     — splits incidents into 3 buckets (da raggiungere /
+                           attivi / chiusi) and builds the panel list
+   buildIncidentCard()   — builds a single incident card DOM element
+   getIncidentStatusLabel() — returns the human-readable status badge text
+                              for a given incident + this resource's response
+================================================================ */
 async function loadIncidents() {
   STATE.incidents = await fetchIncidents();
   renderIncidents();
@@ -193,70 +473,15 @@ function getIncidentStatusLabel(inc) {
 }
 
 /* ================================================================
-   OUTCOME PANEL — shared between new form and detail modal
+   OUTCOME HELPERS
+   initOutcomePanel(containerEl) — wires click events on outcome options,
+                                   shows/hides sub-detail panels (PMA select etc.)
+   readOutcomePanel()            — reads the selected outcome from the panel,
+                                   validates required fields, returns outcome data
+   executeOutcome(responseId, outcomeData) — writes the outcome to the DB,
+                                   handles handoff RPC or direct update
 ================================================================ */
-async function buildOutcomePanelHTML() {
-  const allResources  = await fetchEventResources();
-  const pmaResources  = allResources.filter(r => r.resource_type === 'PMA');
-  const teamResources = allResources.filter(r => !['PMA','LDC', 'PCA'].includes(r.resource_type));
 
-  const pmaOptions  = pmaResources.map(r =>
-    `<option value="${r.id}">${r.resource}</option>`).join('');
-  const teamOptions = teamResources.map(r =>
-    `<option value="${r.id}">${r.resource} (${r.resource_type})</option>`).join('');
-  const isClinical = CLINICAL_TYPES.includes(STATE.resource.resource_type);
-
-  return `
-  <div class="outcome-panel">
-    <div class="outcome-opt" data-outcome-type="treated_and_released">
-      <span>✔</span> Trattato e dimesso
-    </div>
-
-    <div class="outcome-opt" data-outcome-type="consegnato_squadra">
-      <span>🤝</span> Consegnato ad altra squadra
-    </div>
-    <div class="outcome-detail" id="od-squadra" style="display:none;">
-      <div class="outcome-detail-label">Quale squadra?</div>
-      <select id="od-squadra-select">
-        <option value="">— Seleziona —</option>${teamOptions}
-      </select>
-    </div>
-
-    <div class="outcome-opt" data-outcome-type="trasportato_pma">
-      <span>🏥</span> Trasportato al PMA 
-    </div>
-    <div class="outcome-detail" id="od-pma" style="display:none;">
-      <div class="outcome-detail-label">Quale PMA?<span class="required">*</span></div>
-      <select id="od-pma-select">
-        <option value="">— Seleziona —</option>${pmaOptions}
-      </select>
-    </div>
-
-    ${isClinical ? `
-    <div class="outcome-opt" data-outcome-type="ospedalizzato">
-      <span>🚑</span> Ospedalizzato
-    </div>
-    <div class="outcome-detail" id="od-ospedale" style="display:none;">
-      <div class="outcome-detail-label">Ospedale <span class="required">*</span></div>
-      <input type="text" id="od-ospedale-name" placeholder="Nome ospedale..." />
-      <div class="outcome-detail-label" style="margin-top:6px;">Codice GIPSE <span class="required">*</span></div>
-      <input type="text" id="od-gipse" placeholder="Codice GIPSE..." />
-    </div>
-    ` : ''}
-
-    <div class="outcome-opt" data-outcome-type="consegnato_118">
-      <span>🚨</span> Consegnato al 118
-    </div>
-
-    <div class="outcome-opt" data-outcome-type="rifiuta_trasporto">
-      <span>🚶</span> Rifiuta il trasporto
-    </div>
-
-    <div class="outcome-opt" data-outcome-type="annullato">
-      <span>✕</span> Annullato / Falso allarme
-    </div>
-  </div>`;
-}
 
 function initOutcomePanel(containerEl) {
   const detailDivs = {
@@ -324,12 +549,8 @@ function readOutcomePanel() {
   }
 }
 
-/* ================================================================
-   EXECUTE OUTCOME — shared handler
-================================================================ */
 async function executeOutcome(responseId, outcomeData) {
   const { dbOutcome, toResourceId, dest_hospital, notes } = outcomeData;
-console.log('executeOutcome:', responseId, outcomeData);
 
   if (toResourceId) {
     await db.rpc('handoff_incident', {
@@ -348,42 +569,148 @@ console.log('executeOutcome:', responseId, outcomeData);
   }
 }
 
+
 /* ================================================================
    NEW INCIDENT FORM
+   openIncidentForm()   — builds modal body using shared HTML builders,
+                          wires all events (Y/N, triage, gender, location,
+                          status selector, submit), then opens the modal
+                          and auto-fetches GPS position
+   submitIncident()     — validates form, builds RPC params, calls
+                          create_incident_with_assessment, handles offline queue
 ================================================================ */
-function openIncidentForm() {
-  resetIncidentForm();
+async function openIncidentForm() {
 
-  // Y/N buttons default to Sì
-  ['conscious', 'respiration', 'circulation', 'walking', 'minor_injuries'].forEach(field => {
-    STATE.formData[field] = true;
-    const btn = document.querySelector(`.yn-btn.yn-yes[data-field="${field}"]`);
-    if (btn) btn.classList.add('active');
+  // Reset state
+  STATE.formData = {
+    triage: null, conscious: true, respiration: true, circulation: true,
+    walking: null, minor_injuries: null, gender: null,
+    status: 'in_progress', outcomeType: null, lat: null, lng: null,
+  };
+
+  const isClinical = CLINICAL_TYPES.includes(STATE.resource.resource_type);
+
+  // Fetch resources for outcome panel (only needed if we show it, but fetch early)
+  const allResources  = await fetchEventResources();
+  const pmaOptions    = allResources.filter(r => r.resource_type === 'PMA')
+    .map(r => `<option value="${r.id}">${r.resource}</option>`).join('');
+  const teamOptions   = allResources.filter(r => !['PMA','LDC','PCA'].includes(r.resource_type))
+    .map(r => `<option value="${r.id}">${r.resource} (${r.resource_type})</option>`).join('');
+
+  // Build modal body
+  const body = document.querySelector('#modal-incident .modal-body');
+  body.innerHTML = `
+    ${buildPatientHTML()}
+    ${buildBaseConditionsHTML({ conscious: true, respiration: true, circulation: true })}
+    ${isClinical ? buildClinicalHTML() : ''}
+    ${buildLocationTimeHTML()}
+
+    <div class="form-section">
+      <div class="form-section-title">Stato attuale</div>
+      <div class="status-selector">
+        <div class="status-option selected" id="status-opt-active">
+          <span class="status-option-icon">🚨</span>
+          <div>
+            <div style="font-weight:bold;">In corso</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">
+              Sto ancora trattando il paziente
+            </div>
+          </div>
+        </div>
+        <div class="status-option" id="status-opt-resolved">
+          <span class="status-option-icon">✅</span>
+          <div>
+            <div style="font-weight:bold;">Già risolto</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">
+              Intervento concluso — seleziona esito
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="form-outcome-panel"></div>
+    </div>
+
+    <button class="btn-submit-incident" id="btn-submit-incident">
+      Registra Intervento
+    </button>
+  `;
+
+  // Wire Y/N buttons
+  wireYNButtons(body, STATE.formData, ['conscious', 'respiration', 'circulation']);
+
+  // Wire triage
+  if (isClinical) wireTriageButtons(body, STATE.formData);
+
+  // Wire gender
+  body.querySelectorAll('.seg-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      body.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      STATE.formData.gender = btn.dataset.value;
+    });
   });
 
-  // Age
-  const age = document.getElementById('f-patient-age');
-  if (age) age.value = '';
+  // Wire age steppers
+  body.querySelector('#age-up')?.addEventListener('click', () => {
+    const input = body.querySelector('#f-patient-age');
+    input.value = Math.min((parseInt(input.value) || 40) + 10, 120);
+  });
+  body.querySelector('#age-down')?.addEventListener('click', () => {
+    const input = body.querySelector('#f-patient-age');
+    input.value = Math.max((parseInt(input.value) || 60) - 10, 0);
+  });
 
-  // Clinical section visibility
-  const clinical = document.getElementById('section-clinical');
-  if (clinical) {
-    clinical.style.display =
-      CLINICAL_TYPES.includes(STATE.resource.resource_type) ? 'block' : 'none';
-  }
+  // Wire location button
+  body.querySelector('#btn-get-location')?.addEventListener('click', async () => {
+    const btn = body.querySelector('#btn-get-location');
+    btn.textContent = '📍 Localizzazione...';
+    try {
+      const pos = await getCurrentPosition();
+      STATE.formData.lat = pos.coords.latitude;
+      STATE.formData.lng = pos.coords.longitude;
+      const lat = pos.coords.latitude.toFixed(5);
+      const lng = pos.coords.longitude.toFixed(5);
+      body.querySelector('#location-coords').textContent = `${lat}, ${lng}`;
+      body.querySelector('#location-accuracy').textContent =
+        `Accuratezza: ±${Math.round(pos.coords.accuracy)}m`;
+      body.querySelector('#location-display').style.display = 'flex';
+      body.querySelector('#location-map-img').src =
+        `https://www.openstreetmap.org/export/embed.html?bbox=${parseFloat(lng)-0.002},${parseFloat(lat)-0.002},${parseFloat(lng)+0.002},${parseFloat(lat)+0.002}&layer=mapnik&marker=${lat},${lng}`;
+      body.querySelector('#location-map-container').style.display = 'block';
+      btn.textContent = '📍 Aggiorna posizione';
+      btn.classList.add('got');
+    } catch (_) {
+      btn.textContent = '📍 Usa posizione attuale';
+      showToast('GPS non disponibile — premi il pulsante per riprovare', 'error', 4000);
+    }
+  });
 
-  // Alert time default now
-  const timeInput = document.getElementById('f-alert-time');
-  if (timeInput) {
-    const now   = new Date();
-    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-      .toISOString().slice(0, 16);
-    timeInput.value = local;
-  }
+  // Wire status selector
+  body.querySelector('#status-opt-active')?.addEventListener('click', () => {
+    STATE.formData.status = 'in_progress';
+    STATE.formData.outcomeType = null;
+    body.querySelector('#status-opt-active').classList.add('selected');
+    body.querySelector('#status-opt-resolved').classList.remove('selected');
+    body.querySelector('#form-outcome-panel').innerHTML = '';
+  });
+
+  body.querySelector('#status-opt-resolved')?.addEventListener('click', () => {
+    STATE.formData.status = 'resolved';
+    STATE.formData.outcomeType = null;
+    body.querySelector('#status-opt-active').classList.remove('selected');
+    body.querySelector('#status-opt-resolved').classList.add('selected');
+    const panel = body.querySelector('#form-outcome-panel');
+    panel.innerHTML = buildOutcomeOptionsHTML(pmaOptions, teamOptions, isClinical);
+    initOutcomePanel(panel);
+  });
+
+  // Wire submit
+  body.querySelector('#btn-submit-incident').addEventListener('click', submitIncident);
+
   openModal('modal-incident');
 
-   // Auto-fetch location
-  const locBtn = document.getElementById('btn-get-location');
+  // Auto-fetch location
+  const locBtn = body.querySelector('#btn-get-location');
   locBtn.textContent = '📍 Localizzazione...';
   getCurrentPosition()
     .then(pos => {
@@ -391,17 +718,13 @@ function openIncidentForm() {
       STATE.formData.lng = pos.coords.longitude;
       const lat = pos.coords.latitude.toFixed(5);
       const lng = pos.coords.longitude.toFixed(5);
-      document.getElementById('location-coords').textContent = `${lat}, ${lng}`;
-      document.getElementById('location-accuracy').textContent =
+      body.querySelector('#location-coords').textContent = `${lat}, ${lng}`;
+      body.querySelector('#location-accuracy').textContent =
         `Accuratezza: ±${Math.round(pos.coords.accuracy)}m`;
-      document.getElementById('location-display').style.display = 'flex';
-
-      // Static map image
-      const mapImg = document.getElementById('location-map-img');
-      const mapContainer = document.getElementById('location-map-container');
-      mapImg.src = `https://www.openstreetmap.org/export/embed.html?bbox=${parseFloat(lng)-0.002},${parseFloat(lat)-0.002},${parseFloat(lng)+0.002},${parseFloat(lat)+0.002}&layer=mapnik&marker=${lat},${lng}`;
-      mapContainer.style.display = 'block';
-
+      body.querySelector('#location-display').style.display = 'flex';
+      body.querySelector('#location-map-img').src =
+        `https://www.openstreetmap.org/export/embed.html?bbox=${parseFloat(lng)-0.002},${parseFloat(lat)-0.002},${parseFloat(lng)+0.002},${parseFloat(lat)+0.002}&layer=mapnik&marker=${lat},${lng}`;
+      body.querySelector('#location-map-container').style.display = 'block';
       locBtn.textContent = '📍 Aggiorna posizione';
       locBtn.classList.add('got');
     })
@@ -409,36 +732,6 @@ function openIncidentForm() {
       locBtn.textContent = '📍 Usa posizione attuale';
       showToast('GPS non disponibile — premi il pulsante per riprovare', 'error', 4000);
     });
-}
-
-function resetIncidentForm() {
-  STATE.formData = {
-    triage: null, conscious: null, respiration: null,
-    circulation: null, walking: null, gender: null,
-    status: 'in_progress', outcomeType: null, lat: null, lng: null,
-  };
-  document.querySelectorAll('.yn-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.triage-btn').forEach(b => b.classList.remove('selected'));
-  document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
-  ['f-patient-name','f-patient-id','f-clinical-notes','f-description',
-   'f-heart-rate','f-spo2','f-breathing-rate', 'f-blood-pressure', 'f-temperature'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-  const age = document.getElementById('f-patient-age');
-  if (age) age.value = '';
- 
-
-  const incType = document.getElementById('f-incident-type');
-  if (incType) incType.value = 'medical';
-  document.getElementById('status-opt-active')?.classList.add('selected');
-  document.getElementById('status-opt-resolved')?.classList.remove('selected');
-  const panel = document.getElementById('form-outcome-panel');
-  if (panel) panel.innerHTML = '';
-  const locDisplay = document.getElementById('location-display');
-  if (locDisplay) locDisplay.style.display = 'none';
-  const locBtn = document.getElementById('btn-get-location');
-  if (locBtn) { locBtn.classList.remove('got'); locBtn.textContent = '📍 Usa posizione attuale'; }
 }
 
 async function submitIncident() {
@@ -452,12 +745,6 @@ async function submitIncident() {
   }
   if (STATE.formData.circulation === null) {
     showToast('Indica il circolo', 'error'); return;
-  }
-  if (!document.getElementById('f-description')?.value.trim()) {
-    showToast('Inserisci una descrizione', 'error'); return;
-  }
-  if (STATE.formData.minor_injuries === null) {
-    showToast('Indica se è un problema minore', 'error'); return;
   }
   if (CLINICAL_TYPES.includes(STATE.resource.resource_type) && !STATE.formData.triage) {
     showToast('Seleziona il triage', 'error'); return;
@@ -477,22 +764,24 @@ async function submitIncident() {
     const lng = STATE.formData.lng || STATE.event?.center_lng;
 
     const ageVal   = document.getElementById('f-patient-age')?.value  || '';
-      const hrVal    = document.getElementById('f-heart-rate')?.value   || '';
-      const spo2Val  = document.getElementById('f-spo2')?.value         || '';
-      const brSlider = document.getElementById('f-breathing-rate');
-      const brValue  = brSlider && parseInt(brSlider.value) > 0
-        ? parseInt(brSlider.value) : null;
+    const hrVal    = document.getElementById('f-heart-rate')?.value   || '';
+    const spo2Val  = document.getElementById('f-spo2')?.value         || '';
+    const brSlider = document.getElementById('f-breathing-rate');
+    const brValue  = brSlider && parseInt(brSlider.value) > 0
+      ? parseInt(brSlider.value) : null;
 
-      const initialOutcome = outcomeData ? outcomeData.dbOutcome : null;
+    const initialOutcome = outcomeData ? outcomeData.dbOutcome : null;
 
     const params = {
       p_event_id:           STATE.resource.event_id,
       p_resource_id:        STATE.resource.id,
-      p_personnel_id:       STATE.personnel?.id || null,   // ← new
+      p_personnel_id:       STATE.personnel?.id || null,   
+      p_reporting_resource_id:  null,                          
       p_incident_type:      CLINICAL_TYPES.includes(STATE.resource.resource_type)
                               ? document.getElementById('f-incident-type')?.value || null : null,
       p_lng:                lng,
       p_lat:                lat,
+      p_location_description:   null,
       p_patient_name:       document.getElementById('f-patient-name')?.value    || null,
       p_patient_age:        ageVal !== '' ? parseInt(ageVal) : null,
       p_patient_gender:     STATE.formData.gender                                || null,
@@ -513,6 +802,12 @@ async function submitIncident() {
                     ? parseFloat(document.getElementById('f-temperature')?.value) : null,           
       p_triage:             STATE.formData.triage,
       p_clinical_notes:     document.getElementById('f-clinical-notes')?.value || null,
+      p_iv_access:              (() => {
+                              const b = document.querySelector('#modal-incident .yn-btn[data-field="iv_access"].active');
+                              return b ? b.dataset.value === 'true' : null;
+                            })(),
+      p_gcs_total:          null,
+      p_hgt:                null,
     };
 
 
@@ -545,43 +840,17 @@ async function submitIncident() {
   }
 }
 
-async function reopenIncident(incidentId) {
-  try {
-    // Find this resource's most recent response on this incident
-    const { data: response, error } = await db
-      .from('incident_responses')
-      .select('id')
-      .eq('incident_id', incidentId)
-      .eq('resource_id', STATE.resource.id)
-      .order('assigned_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (error || !response) {
-      showToast('Nessuna risposta trovata', 'error');
-      return;
-    }
-
-    const { error: updateError } = await db
-      .from('incident_responses')
-      .update({ outcome: 'treating', released_at: null })
-      .eq('id', response.id);
-
-    if (updateError) throw updateError;
-
-    closeModal('modal-detail');
-    showToast('Intervento riaperto', 'success');
-    await loadIncidents();
-    await refreshHeaderStatus();
-
-  } catch (err) {
-    showToast('Errore: ' + err.message, 'error');
-  }
-}
-
-
 /* ================================================================
    INCIDENT DETAIL MODAL
+   openIncidentDetail(incidentId) — fetches full incident data, renders
+                                    the detail body, wires all action buttons
+                                    (assessment, edit patient, en route,
+                                    arrived, close, reopen)
+   buildDetailHTML(inc)           — builds the full detail HTML: da raggiungere
+                                    block, outcome summary, patient card, assessment
+                                    history, rapid actions, close incident panel
+   confirmDetailOutcome(id)       — reads and executes the selected closing outcome
+   reopenIncident(id)             — sets response outcome back to 'treating'
 ================================================================ */
 async function openIncidentDetail(incidentId) {
   const body = document.getElementById('detail-body');
@@ -595,7 +864,13 @@ async function openIncidentDetail(incidentId) {
   }
 
   const titleEl = document.getElementById('detail-title');
-  titleEl.textContent = STATUS_LABELS[inc.status] || inc.status;
+  const myDetailResponse = (inc.incident_responses || [])
+    .find(r => r.resource_id === STATE.resource.id);
+  const myOutcome = myDetailResponse?.outcome;
+  titleEl.textContent =
+    myOutcome === 'en_route_to_incident' ? 'In arrivo' :
+    ['treating', 'en_route_to_pma', 'en_route_to_hospital'].includes(myOutcome) ? 'In corso' :
+    'Chiuso';
   titleEl.dataset.incidentId = incidentId;
 
   body.innerHTML = await buildDetailHTML(inc);
@@ -679,8 +954,10 @@ async function openIncidentDetail(incidentId) {
   document.getElementById('btn-confirm-enroute-pma')
     ?.addEventListener('click', async () => {
       const pmaId = document.getElementById('enroute-pma-select')?.value;
+      console.log('pmaId:', pmaId);
       if (!pmaId) { showToast('Seleziona il PMA', 'error'); return; }
       const response = await findActiveResponse(incidentId);
+      console.log('response:', response);
       if (!response) { showToast('Nessuna risposta attiva', 'error'); return; }
       const { error } = await db
         .from('incident_responses')
@@ -823,7 +1100,7 @@ async function buildDetailHTML(inc) {
         r => r.resource_id === STATE.resource.id
       );
 
-  const outcomePanelHTML = canClose ? await buildOutcomePanelHTML() : '';
+  const outcomePanelHTML = canClose ? await buildOutcomeOptionsHTML() : '';
 
    //build outcome summary for closed incidents
   const myClosedResponse = canReopen
@@ -846,7 +1123,7 @@ async function buildDetailHTML(inc) {
     } else if (o === 'taken_to_pma') {
       // find the pma resource name from dest_pma_id via allResources
       const pma = [...pmaResources, ...allResources].find(r => r.id === myClosedResponse.dest_pma_id);
-      text = `🏥 Trasportato al PMA${pma ? ': ' + pma.resource : ''}`;
+      text = `🏥 Trasportato al ${pma ? pma.resource : ''}`;
     } else if (o === 'taken_to_hospital') {
       text = `🚑 Ospedalizzato${myClosedResponse.dest_hospital ? ': ' + myClosedResponse.dest_hospital : ''}`;
     } else {
@@ -859,6 +1136,17 @@ async function buildDetailHTML(inc) {
         ${text}
       </div>`;
   })() : '';
+  const otherActiveTeams = (inc.incident_responses || [])
+    .filter(r => r.resource_id !== STATE.resource.id && r.outcome === 'treating')
+    .map(r => r.resources?.resource)
+    .filter(Boolean);
+
+  const activeBlock = (myResponse?.outcome === 'treating' && otherActiveTeams.length > 0) ? `
+    <div style="background:var(--bg-card);border:1.5px solid var(--border-bright);
+      border-radius:var(--radius);padding:12px;margin-bottom:12px;
+      font-size:14px;font-weight:600;color:var(--text-primary);">
+      🤝 In trattamento insieme a ${otherActiveTeams.join(', ')}
+    </div>` : '';
 
   // build resource name lookup from response_id
   const responseResourceMap = {};
@@ -899,12 +1187,23 @@ async function buildDetailHTML(inc) {
       border-radius:var(--radius-lg);padding:12px;margin-bottom:10px;">
       <div class="assessment-header">
         <div style="display:flex;align-items:center;gap:8px;">
-          ${a.triage ? `<div style="width:12px;height:12px;border-radius:50%;flex-shrink:0;background:${
-            a.triage === 'red'    ? 'var(--triage-red)'    :
-            a.triage === 'yellow' ? 'var(--triage-yellow)' :
-            a.triage === 'green'  ? 'var(--triage-green)'  :
-            '#8a9ab0'
-          };"></div>` : ''}
+          ${a.triage ? `
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="width:12px;height:12px;border-radius:50%;flex-shrink:0;background:${
+              a.triage === 'red'    ? 'var(--triage-red)'    :
+              a.triage === 'yellow' ? 'var(--triage-yellow)' :
+              a.triage === 'green'  ? 'var(--triage-green)'  :
+              'var(--triage-white)'
+            };"></div>
+            <span style="font-size:11px;font-weight:700;letter-spacing:1px;
+              text-transform:uppercase;color:${
+              a.triage === 'red'    ? 'var(--triage-red)'    :
+              a.triage === 'yellow' ? 'var(--triage-yellow)' :
+              a.triage === 'green'  ? 'var(--triage-green)'  :
+              'var(--triage-white)'
+            };">Codice ${a.triage === 'red' ? 'Rosso' : a.triage === 'yellow' ? 'Giallo' : a.triage === 'green' ? 'Verde' : 'Bianco'}</span>
+            <span style="color:var(--border-bright);">·</span>
+          </div>` : ''}
           <span class="assessment-by">${resourceName}</span>
         </div>
         <span class="assessment-time">
@@ -923,11 +1222,11 @@ async function buildDetailHTML(inc) {
       </div>` : ''}
       ${a.clinical_notes ? `
       <div style="margin-top:8px;">
-        <div style="font-size:10px;letter-spacing:1.5px;color:var(--blue);
-          text-transform:uppercase;font-weight:700;margin-bottom:4px;">🩺 Note cliniche</div>
+        <div style="font-size:10px;letter-spacing:1.5px;color:var(--text-secondary);
+          text-transform:uppercase;font-weight:700;margin-bottom:4px;">Note cliniche</div>
         <div style="font-size:13px;color:var(--text-primary);line-height:1.5;
           padding:8px 10px;background:var(--bg-page);
-          border-radius:var(--radius);border-left:3px solid var(--blue);word-break:break-word;">
+          border-radius:var(--radius);border:1px solid var(--border);word-break:break-word;">
           ${a.clinical_notes}
         </div>
       </div>` : ''}
@@ -938,13 +1237,19 @@ async function buildDetailHTML(inc) {
         <div class="vital-box"><div class="vital-label">Cammina</div><div class="vital-value">${yn(a.walking)}</div></div>
         <div class="vital-box"><div class="vital-label">Prob. Minore</div><div class="vital-value">${yn(a.minor_injuries)}</div></div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px;">
         <div class="vital-box"><div class="vital-label">FC</div><div class="vital-value">${a.heart_rate ?? '—'}</div></div>
         <div class="vital-box"><div class="vital-label">SpO2</div><div class="vital-value">${a.spo2 != null ? a.spo2+'%' : '—'}</div></div>
-        <div class="vital-box"><div class="vital-label">PA</div><div class="vital-value">${a.blood_pressure ?? '—'}</div></div>
         <div class="vital-box"><div class="vital-label">FR</div><div class="vital-value">${a.breathing_rate ?? '—'}</div></div>
-        <div class="vital-box"><div class="vital-label">Temp</div><div class="vital-value">${a.temperature ?? '—'}</div></div>
+        <div class="vital-box"><div class="vital-label">PA</div><div class="vital-value">${a.blood_pressure ?? '—'}</div></div>
       </div>
+      ${(a.temperature != null || a.gcs_total != null || a.hgt != null || a.iv_access != null) ? `
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+        <div class="vital-box"><div class="vital-label">Temp</div><div class="vital-value">${a.temperature ?? '—'}</div></div>
+        <div class="vital-box"><div class="vital-label">GCS</div><div class="vital-value">${a.gcs_total ?? '—'}</div></div>
+        <div class="vital-box"><div class="vital-label">HGT</div><div class="vital-value">${a.hgt ?? '—'}</div></div>
+        <div class="vital-box"><div class="vital-label">Acc. Venoso</div><div class="vital-value">${yn(a.iv_access)}</div></div>
+      </div>` : ''}
     </div>`;
   };
 
@@ -976,9 +1281,6 @@ async function buildDetailHTML(inc) {
             ▼ Mostra ${n} valutazion${n===1?'e':'i'} precedent${n===1?'e':'i'}
           </button>`;
       })();
-  
-
-
 
   let incidentLat = null, incidentLng = null;
   if (inc.geom?.coordinates) {
@@ -1020,7 +1322,29 @@ async function buildDetailHTML(inc) {
       </button>
     </div>` : '';
 
-  return `${enRouteBlock}${outcomeBlock}
+  const destPmaName = isEnRoutePma
+    ? allResources.find(r => r.id === myResponse.dest_pma_id)?.resource || 'PMA'
+    : null;
+
+  const enRoutePmaHospitalBlock = isEnRoute ? `
+  <div style="padding:14px 16px;border-radius:var(--radius);margin-bottom:12px;
+    background:${isEnRoutePma ? 'var(--blue-dim)' : 'var(--orange-dim)'};
+    border:1.5px solid ${isEnRoutePma ? 'var(--blue)' : 'var(--orange)'};
+    display:flex;align-items:center;gap:10px;">
+    <span style="font-size:22px;">${isEnRoutePma ? '🏥' : '🚑'}</span>
+    <div>
+      <div style="font-size:14px;font-weight:bold;
+        color:${isEnRoutePma ? '#1060cc' : '#8a4a00'};">
+        ${isEnRoutePma ? `In trasporto verso ${destPmaName}` : 'In trasporto verso ospedale'}      
+      </div>
+      ${isEnRouteHospital && myResponse.dest_hospital ? `
+      <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">
+        ${myResponse.dest_hospital}
+      </div>` : ''}
+    </div>
+  </div>` : '';
+
+  return `${enRouteBlock}${enRoutePmaHospitalBlock}${activeBlock}${outcomeBlock}
     <div style="background:var(--bg-card);border-radius:var(--radius);padding:12px;margin-bottom:8px;">
       <div style="font-size:16px;font-weight:bold;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
         ${inc.patient_name || 'Paziente ignoto'}
@@ -1055,23 +1379,7 @@ async function buildDetailHTML(inc) {
       + Aggiungi Valutazione
     </button>` : ''}
 
-       ${isEnRoute ? `
-    <div style="padding:14px 16px;border-radius:var(--radius);margin-bottom:8px;
-      background:${isEnRoutePma ? 'var(--blue-dim)' : 'var(--orange-dim)'};
-      border:1.5px solid ${isEnRoutePma ? 'var(--blue)' : 'var(--orange)'};
-      display:flex;align-items:center;gap:10px;">
-      <span style="font-size:22px;">${isEnRoutePma ? '🏥' : '🚑'}</span>
-      <div>
-        <div style="font-size:14px;font-weight:bold;
-          color:${isEnRoutePma ? '#1060cc' : '#8a4a00'};">
-          ${isEnRoutePma ? 'In trasporto verso PMA' : 'In trasporto verso ospedale'}
-        </div>
-        ${isEnRouteHospital && myResponse.dest_hospital ? `
-        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">
-          ${myResponse.dest_hospital}
-        </div>` : ''}
-      </div>
-    </div>
+    ${isEnRoute ? `
     ${isEnRouteHospital ? `
     <div id="arrived-hospital-detail" style="display:none;flex-direction:column;gap:8px;
       padding:12px;background:var(--bg-card);border-radius:var(--radius);
@@ -1231,65 +1539,95 @@ async function confirmDetailOutcome(incidentId) {
   }
 }
 
-function openAssessmentForm(incidentId, previous = null) {
-  // Reset assessment form state
+async function reopenIncident(incidentId) {
+  try {
+    // Find this resource's most recent response on this incident
+    const { data: response, error } = await db
+      .from('incident_responses')
+      .select('id')
+      .eq('incident_id', incidentId)
+      .eq('resource_id', STATE.resource.id)
+      .order('assigned_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error || !response) {
+      showToast('Nessuna risposta trovata', 'error');
+      return;
+    }
+
+    const { error: updateError } = await db
+      .from('incident_responses')
+      .update({ outcome: 'treating', released_at: null })
+      .eq('id', response.id);
+
+    if (updateError) throw updateError;
+
+    closeModal('modal-detail');
+    showToast('Intervento riaperto', 'success');
+    await loadIncidents();
+    await refreshHeaderStatus();
+
+  } catch (err) {
+    showToast('Errore: ' + err.message, 'error');
+  }
+}
+
+/* ================================================================
+   NEW ASSESSMENT FORM
+   openAssessmentForm(incidentId, previous) — builds modal body with
+                                    pre-filled values from previous assessment
+                                    (or defaults), wires Y/N + triage events,
+                                    opens modal
+   submitAssessment(incidentId)   — validates, inserts patient_assessments row,
+                                    refreshes incident detail
+================================================================ */
+async function openAssessmentForm(incidentId, previous = null) {
+  // Reset state
   STATE.assessmentData = {
-    conscious: null, respiration: null,
-    circulation: null, walking: null, triage: null
+    conscious: null, respiration: null, circulation: null,
+    walking: null, minor_injuries: null, triage: null,
   };
 
-  document.querySelectorAll('#modal-assessment .yn-btn')
-    .forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('#modal-assessment .triage-btn')
-    .forEach(b => b.classList.remove('selected'));
-  ['a-heart-rate','a-spo2','a-breathing-rate', 'a-blood-pressure','a-breathing-rate','a-description', 'a-clinical-notes'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-   // ── Pre-fill from previous assessment if available, else defaults ──
+  const isClinical = CLINICAL_TYPES.includes(STATE.resource.resource_type);
+
+  // Pre-fill values from previous assessment or defaults
   const src = previous || {
-    conscious: true, respiration: true, circulation: true, walking: true, minor_injuries: true,
-    triage: null, heart_rate: null, spo2: null, breathing_rate: null, blood_pressure: null, temperature: null, description: null, clinical_notes: null
+    conscious: true, respiration: true, circulation: true,
+    walking: null, minor_injuries: null, triage: null,
+    heart_rate: null, spo2: null, breathing_rate: null,
+    blood_pressure: null, temperature: null, iv_access: null,
+    description: null, clinical_notes: null,
   };
 
-  // Y/N fields
+  // Pre-fill state for the 5 tracked fields
   ['conscious', 'respiration', 'circulation', 'walking', 'minor_injuries'].forEach(field => {
-    const value = src[field];
-    if (value === null || value === undefined) return;
-    STATE.assessmentData[field] = value;
-    const btn = document.querySelector(
-      `#modal-assessment .yn-btn[data-field="${field}"][data-value="${value}"]`
-    );
-      console.log('btn found:', btn);
-
-    if (btn) btn.classList.add('active');
+    if (src[field] !== null && src[field] !== undefined) {
+      STATE.assessmentData[field] = src[field];
+    }
   });
-  // Numeric fields
-  if (src.heart_rate)    document.getElementById('a-heart-rate').value    = src.heart_rate;
-  if (src.spo2)          document.getElementById('a-spo2').value          = src.spo2;
-  if (src.gcs_total)     document.getElementById('a-gcs').value           = src.gcs_total;
-  if (src.breathing_rate) document.getElementById('a-breathing-rate').value = src.breathing_rate;
-  if (src.blood_pressure) document.getElementById('a-blood-pressure').value = src.blood_pressure;
-  if (src.temperature)    document.getElementById('a-temperature').value   = src.temperature;
+  if (src.triage) STATE.assessmentData.triage = src.triage;
 
-  // Triage
-  if (src.triage) {
-    STATE.assessmentData.triage = src.triage;
-    const triageBtn = document.querySelector(
-      `#modal-assessment .triage-btn[data-triage="${src.triage}"]`
-    );
-    if (triageBtn) triageBtn.classList.add('selected');
-  }
+  // Build modal body using shared builders
 
-  // Clinical section visibility
-  const clinical = document.getElementById('a-section-clinical');
-  if (clinical) {
-    clinical.style.display =
-      CLINICAL_TYPES.includes(STATE.resource.resource_type) ? 'block' : 'none';
-  }
+  const body = document.querySelector('#modal-assessment .modal-body');
+  body.innerHTML = `
+    ${buildBaseConditionsHTML(src)}
+    ${isClinical ? buildClinicalHTML(src, true) : ''}
+    <button class="btn-submit-incident" id="btn-submit-assessment">
+      Salva Valutazione
+    </button>
+  `;
 
-  const btn = document.getElementById('btn-submit-assessment');
-  btn.onclick = () => submitAssessment(incidentId);
+  // Wire Y/N buttons
+  wireYNButtons(body, STATE.assessmentData, ['conscious', 'respiration', 'circulation']);
+
+  // Wire triage
+  if (isClinical) wireTriageButtons(body, STATE.assessmentData);
+
+  // Wire submit and close
+  body.querySelector('#btn-submit-assessment').addEventListener('click',
+    () => submitAssessment(incidentId));
   document.getElementById('modal-assessment-close').onclick =
     () => closeModal('modal-assessment');
 
@@ -1307,13 +1645,7 @@ async function submitAssessment(incidentId) {
   if (STATE.assessmentData.circulation === null) {
     showToast('Indica il circolo', 'error'); return;
   }
-  if (STATE.assessmentData.walking === null) {
-    showToast('Indica se cammina', 'error'); return;
-  }
-  if (STATE.assessmentData.minor_injuries === null) {
-    showToast('Indica se è un problema minore', 'error'); return;
-  }
-  if (!document.getElementById('a-description')?.value.trim()) {
+  if (!document.getElementById('f-description')?.value.trim()) {
     showToast('Inserisci una descrizione', 'error'); return;
   }
   btn.disabled = true;
@@ -1327,7 +1659,7 @@ async function submitAssessment(incidentId) {
       return;
     }
 
-    const brSlider = document.getElementById('a-breathing-rate');
+    const brSlider = document.getElementById('f-breathing-rate');
     const brValue  = brSlider && parseInt(brSlider.value) > 0
       ? parseInt(brSlider.value) : null;
 
@@ -1342,16 +1674,22 @@ async function submitAssessment(incidentId) {
         respiration:    STATE.assessmentData.respiration,
         circulation:    STATE.assessmentData.circulation,
         walking:        STATE.assessmentData.walking,
-        minor_injuries:  STATE.assessmentData.minor_injuries,
-        heart_rate:     parseInt(document.getElementById('a-heart-rate')?.value) || null,
-        spo2:           parseInt(document.getElementById('a-spo2')?.value)        || null,
+        minor_injuries: STATE.assessmentData.minor_injuries,
+        heart_rate:     parseInt(document.getElementById('f-heart-rate')?.value) || null,
+        spo2:           parseInt(document.getElementById('f-spo2')?.value)        || null,
         breathing_rate: brValue,
-        blood_pressure: document.getElementById('a-blood-pressure')?.value || null,
-        temperature:    document.getElementById('a-temperature')?.value !== ''
-          ? parseFloat(document.getElementById('a-temperature')?.value) : null,
+        blood_pressure: document.getElementById('f-blood-pressure')?.value || null,
+        temperature:    document.getElementById('f-temperature')?.value !== ''
+          ? parseFloat(document.getElementById('f-temperature')?.value) : null,
+        iv_access: (() => {
+          const b = document.querySelector('#modal-assessment .yn-btn[data-field="iv_access"].active');
+          return b ? b.dataset.value === 'true' : null;
+        })(),
+        gcs_total: parseInt(document.getElementById('f-gcs')?.value) || null,
+        hgt:       document.getElementById('f-hgt')?.value || null,
         triage:         STATE.assessmentData.triage,
-        description:          document.getElementById('a-description')?.value.trim()          || null,
-        clinical_notes: document.getElementById('a-clinical-notes')?.value.trim() || null,
+        description:          document.getElementById('f-description')?.value.trim()          || null,
+        clinical_notes: document.getElementById('f-clinical-notes')?.value.trim() || null,
       });
 
     if (error) throw error;
@@ -1369,6 +1707,13 @@ async function submitAssessment(incidentId) {
     btn.textContent = 'Salva Valutazione';
   }
 }
+
+/* ================================================================
+   EDIT PATIENT
+   openEditPatient(inc)   — pre-fills modal-patient with current incident
+                            patient data, wires age stepper + gender + save
+   savePatient(incidentId) — updates incidents table with new patient data
+================================================================ */
 
 function openEditPatient(inc) {
   // Pre-fill with current values
@@ -1446,8 +1791,12 @@ async function savePatient(incidentId) {
   }
 }
 
+
 /* ================================================================
-   WIRE UP ALL FORM EVENTS
+   INIT
+   initIncidentForm() — called once on app load. Wires the open-form button,
+                        modal close buttons, and backdrop click-to-close.
+                        All other events are wired dynamically on modal open.
 ================================================================ */
 function initIncidentForm() {
   document.getElementById('btn-open-incident-form')
@@ -1459,162 +1808,10 @@ function initIncidentForm() {
   document.querySelectorAll('.modal-backdrop').forEach(b => {
     b.addEventListener('click', e => { if (e.target === b) closeModal(b.id); });
   });
-  document.getElementById('btn-submit-incident')
-    .addEventListener('click', submitIncident);
-  document.getElementById('age-up')?.addEventListener('click', () => {
-    const input = document.getElementById('f-patient-age');
-    const current = input.value === '' ? 40 : parseInt(input.value);
-    input.value   = Math.min(current + 10, 120);
-
-  });
-
-  document.getElementById('age-down')?.addEventListener('click', () => {
-    const input = document.getElementById('f-patient-age');
-    const current = input.value === '' ? 60 : parseInt(input.value);
-    input.value   = Math.max(current - 10, 0);
-  });
-
-  // Y/N buttons — main incident form
-  document.querySelectorAll('#modal-incident .yn-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const field = btn.dataset.field;
-      const value = btn.dataset.value === 'true';
-      if (btn.classList.contains('active')) {
-        STATE.formData[field] = null;
-        btn.classList.remove('active');
-      } else {
-        STATE.formData[field] = value;
-        btn.closest('.yn-buttons').querySelectorAll('.yn-btn')
-          .forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-      }
-      if (field === 'respiration') {
-        setYNField('walking', STATE.formData.respiration !== false);
-        setYNField('minor_injuries', STATE.formData.minor_injuries !== false);
-      }
-      if (field === 'conscious') {
-        setYNField('walking',        STATE.formData.conscious !== false);
-        if (STATE.formData.conscious === false) setYNField('minor_injuries', false);
-      }
-      if (field === 'circulation') {
-        setYNField('walking',          STATE.formData.circulation !== false);
-        if (STATE.formData.circulation === false) setYNField('minor_injuries', false);
-      }
-    });
-  });
-
-  // Y/N buttons — assessment modal
-  document.querySelectorAll('#modal-assessment .yn-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const field      = btn.dataset.field;
-      const value      = btn.dataset.value === 'true';
-      const stateField = field.replace('a_', '');
-      if (btn.classList.contains('active')) {
-        STATE.assessmentData[stateField] = null;
-        btn.classList.remove('active');
-      } else {
-        STATE.assessmentData[stateField] = value;
-        btn.closest('.yn-buttons').querySelectorAll('.yn-btn')
-          .forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-      }
-
-      // Side effects — same rules as main form
-      if (stateField === 'respiration') {
-        setAssessmentYN('walking', STATE.assessmentData.respiration !== false);
-        if (STATE.assessmentData.respiration === false)
-          setAssessmentYN('minor_injuries', false);
-      }
-      if (stateField === 'conscious'){
-        setAssessmentYN('walking', STATE.assessmentData.conscious   !== false);
-        if (STATE.assessmentData.conscious === false)
-        setAssessmentYN('minor_injuries', false);
-      }
-      if (stateField === 'circulation'){
-        setAssessmentYN('walking', STATE.assessmentData.circulation !== false);
-        if (STATE.assessmentData.circulation === false)
-        setAssessmentYN('minor_injuries', false);
-      }
-    });
-  });
-
-  // Triage — main form
-  document.querySelectorAll('#modal-incident .triage-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#modal-incident .triage-btn')
-        .forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      STATE.formData.triage = btn.dataset.triage;
-    });
-  });
-
-  // Triage — assessment modal
-  document.querySelectorAll('#modal-assessment .triage-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#modal-assessment .triage-btn')
-        .forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      STATE.assessmentData.triage = btn.dataset.triage;
-    });
-  });
-
-  // Gender
-  document.querySelectorAll('.seg-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      STATE.formData.gender = btn.dataset.value;
-    });
-  });
-
-  // Status
-  document.getElementById('status-opt-active')
-    ?.addEventListener('click', () => selectFormStatus('in_progress'));
-  document.getElementById('status-opt-resolved')
-    ?.addEventListener('click', () => selectFormStatus('resolved'));
-
-  // Location
-  document.getElementById('btn-get-location')
-    ?.addEventListener('click', async () => {
-      const btn = document.getElementById('btn-get-location');
-      btn.textContent = '📍 Localizzazione...';
-      try {
-        const pos = await getCurrentPosition();
-        STATE.formData.lat = pos.coords.latitude;
-        STATE.formData.lng = pos.coords.longitude;
-        const lat = pos.coords.latitude.toFixed(5);
-        const lng = pos.coords.longitude.toFixed(5);
-        document.getElementById('location-coords').textContent = `${lat}, ${lng}`;
-        document.getElementById('location-accuracy').textContent =
-          `Accuratezza: ±${Math.round(pos.coords.accuracy)}m`;
-        document.getElementById('location-display').style.display = 'flex';
-        btn.textContent = '📍 Aggiorna posizione';
-        btn.classList.add('got');
-        // Static map
-        document.getElementById('location-map-img').src =
-          `https://www.openstreetmap.org/export/embed.html?bbox=${parseFloat(lng)-0.002},${parseFloat(lat)-0.002},${parseFloat(lng)+0.002},${parseFloat(lat)+0.002}&layer=mapnik&marker=${lat},${lng}`;
-        document.getElementById('location-map-container').style.display = 'block';
-      } catch (_) {
-        btn.textContent = '📍 Usa posizione attuale';
-        showToast('Impossibile ottenere la posizione', 'error');
-      }
-    });
 }
 
-async function selectFormStatus(status) {
-  STATE.formData.status     = status;
-  STATE.formData.outcomeType = null;
-  document.getElementById('status-opt-active')
-    ?.classList.toggle('selected', status === 'in_progress');
-  document.getElementById('status-opt-resolved')
-    ?.classList.toggle('selected', status === 'resolved');
-  const panel = document.getElementById('form-outcome-panel');
-  if (!panel) return;
-  if (status === 'resolved') {
-    panel.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--text-secondary);">Caricamento...</div>';
-    panel.innerHTML = await buildOutcomePanelHTML();
-    initOutcomePanel(panel);
-  } else {
-    panel.innerHTML = '';
-  }
-}
+
+
+
+
+

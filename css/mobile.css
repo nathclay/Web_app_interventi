@@ -722,10 +722,10 @@ ul { list-style: none; }
 .triage-btn.yellow { color: #8a6e00; background: rgba(184,154,0,0.12);   border: 2px solid rgba(184,154,0,0.3); }
 .triage-btn.green  { color: #18a050; background: rgba(24,160,80,0.10);   border: 2px solid rgba(24,160,80,0.3); }
 .triage-btn.white  { color: #4a5a70; background: rgba(100,120,140,0.10); border: 2px solid rgba(100,120,140,0.3); }
-.triage-btn.red.selected    { border-color: #cc1a1a; }
-.triage-btn.yellow.selected { border-color: #8a6e00; }
-.triage-btn.green.selected  { border-color: #18a050; }
-.triage-btn.white.selected  { border-color: #4a5a70; }
+.triage-btn.red.selected    { border-color: #000; border-width: 3px; background: rgba(204,26,26,0.25); }
+.triage-btn.yellow.selected { border-color: #000; border-width: 3px; background: rgba(184,154,0,0.25); }
+.triage-btn.green.selected  { border-color: #000; border-width: 3px; background: rgba(24,160,80,0.25); }
+.triage-btn.white.selected  { border-color: #000; border-width: 3px; background: rgba(100,120,140,0.25); }
 
 /* ── Location section ── */
 .btn-get-location {
