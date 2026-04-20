@@ -286,7 +286,7 @@ async function insertLocation(coords) {
       resource_id: STATE.resource.id,
       event_id:    STATE.resource.event_id,
       geom:        `POINT(${coords.longitude} ${coords.latitude})`,
-      accuracy_m:  coords.accuracy   || null,
+      accuracy_m: coords.accuracy != null ? Math.min(coords.accuracy, 9999.99) : null,
       speed_kmh:   coords.speed != null ? coords.speed * 3.6 : null,
       heading_deg: coords.heading    || null,
     });

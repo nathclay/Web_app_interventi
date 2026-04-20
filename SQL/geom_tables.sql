@@ -3,7 +3,7 @@ CREATE TABLE event_route (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   event_id uuid REFERENCES events(id),
   name text NOT NULL,
-  geom geometry(LineString, 4326) NOT NULL,
+  geom geometry(MultiLineString, 4326) NOT NULL,
   total_distance_km float GENERATED ALWAYS AS (ST_Length(geom::geography) / 1000) STORED
 );
 ALTER TABLE event_route ENABLE ROW LEVEL SECURITY;
@@ -18,6 +18,21 @@ CREATE TABLE markers_route (
 );
 ALTER TABLE markers_route ENABLE ROW LEVEL SECURITY;
 
+CREATE TABLE fixed_resources (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_id uuid REFERENCES events(id),
+  label text,               
+  geom geometry(Point, 4326)
+);
+ALTER TABLE fixed_resources ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE grid (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_id uuid REFERENCES events(id),
+  label text,               
+  geom geometry(Multipolygon, 4326)
+);
+ALTER TABLE grid ENABLE ROW LEVEL SECURITY;
 
 -- Points of interest (internal or external of the route)
 -- examples: water station, defibrillator, protezione civile, pizzeria, etc

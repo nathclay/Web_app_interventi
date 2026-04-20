@@ -10,6 +10,8 @@
   <link rel="stylesheet" href="css/pca-pma.css" />
   <link rel="stylesheet" href="css/pca-dispositivo.css" />
   <link rel="stylesheet" href="css/pca-import.css" />
+  <link rel="stylesheet" href="css/pca-hospital.css" />
+  <link rel="stylesheet" href="css/pca-settings.css" />
 </head>
 <body>
 
@@ -42,7 +44,9 @@
   </div>
 </div>
 
- <!-- SCREEN 2 — CHI SEI? -->
+<!-- ============================================================
+     SCREEN2: chi sei? (personnel selection)
+============================================================ -->
   <div id="screen-personnel" class="screen hidden">
     <div class="personnel-header">
       <div class="personnel-resource-badge">
@@ -79,8 +83,12 @@
         <span class="sidebar-label">Moduli</span>
       </button>
       <button class="sidebar-item" data-page="pma">
-        <span class="sidebar-icon">🏥</span>
+        <span class="sidebar-icon">⛑️</span>
         <span class="sidebar-label">PMA</span>
+      </button>
+      <button class="sidebar-item" data-page="ospedalizzazioni">
+        <span class="sidebar-icon">🏥</span>
+        <span class="sidebar-label">Ospedale</span>
       </button>
       <button class="sidebar-item" data-page="dispositivo">
         <span class="sidebar-icon">👥</span>
@@ -179,12 +187,54 @@
         <!-- CENTER: Map -->
         <main class="panel-map" id="panel-map">
           <div id="map"></div>
-          <div class="map-controls">
-            <div class="map-ctrl-label">LAYER MAPPA</div>
-            <button class="map-layer-btn active" data-layer="risorse">Risorse</button>
-            <button class="map-layer-btn active" data-layer="coordinatori">Coordinatori</button>
-            <button class="map-layer-btn active" data-layer="attivi">Int. attivi</button>
-            <button class="map-layer-btn active" data-layer="chiusi">Int. chiusi</button>
+          <div class="map-controls-stack" id="map-controls-stack">
+            <div class="map-controls" id="map-controls-panel">
+              <div class="map-ctrl-header" onclick="toggleMapPanel()">
+                <span class="map-ctrl-title">LAYERS</span>
+                <span id="map-ctrl-chevron">▾</span>
+              </div>
+              <div id="map-ctrl-body">
+                <!-- Basemap -->
+                <div class="map-ctrl-section">
+                  <div class="map-ctrl-label">Stile mappa</div>
+                  <select id="basemap-select" onchange="switchBasemap(this.value)"
+                    style="width:100%;font-size:11px;padding:3px 6px;border-radius:var(--radius);
+                      border:1px solid var(--border-bright);background:var(--bg);
+                      color:var(--text-primary);">
+                    <option value="voyager">Standard</option>
+                    <option value="satellite">Satellite</option>
+                  </select>
+                </div>
+                <!-- Geometry layers — populated dynamically -->
+                <div class="map-ctrl-section" id="geo-layers-section" style="display:none;">
+                  <div class="map-ctrl-label">Geometrie</div>
+                  <div id="geo-layer-toggles" style="display:flex;flex-direction:column;gap:4px;"></div>
+                </div>
+                <!-- Existing layers -->
+                <div class="map-ctrl-section">
+                  <div class="map-ctrl-label">Risorse</div>
+                  <button class="map-layer-btn active" data-layer="risorse">Risorse</button>
+                  <button class="map-layer-btn active" data-layer="coordinatori">Coordinatori</button>
+                  <button class="map-layer-btn active" data-layer="attivi">Int. attivi</button>
+                  <button class="map-layer-btn" data-layer="chiusi">Int. chiusi</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- MODAL: Geo Layer Style -->
+          <div id="modal-geo-style" class="modal-overlay hidden">
+            <div class="modal-box" style="width:320px;">
+              <div class="modal-header">
+                <h2 id="geo-style-title">Stile layer</h2>
+                <button class="modal-close" onclick="closeModal('modal-geo-style')">✕</button>
+              </div>
+              <div class="modal-body" id="geo-style-body"></div>
+              <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('modal-geo-style')">Annulla</button>
+                <button class="btn-primary" id="geo-style-save"
+                  style="width:auto;padding:8px 20px;">Applica</button>
+              </div>
+            </div>
           </div>
           <div class="map-legend">
             <div class="legend-title">LEGENDA</div>
@@ -282,7 +332,9 @@
   </div>
 </div>
 
-<!-- MODAL: Add resource to incident -->
+<!-- ============================================================
+     MODAL: Add resource to incident
+============================================================ -->
 <div id="modal-add-resource" class="modal-overlay hidden">
   <div class="modal-box">
     <div class="modal-header">
@@ -311,7 +363,9 @@
   </div>
 </div>
 
-<!-- MODAL: Close incident -->
+<!-- ============================================================
+     MODAL: Close incident
+============================================================ -->
 <div id="modal-close-incident" class="modal-overlay hidden">
   <div class="modal-box">
     <div class="modal-header">
@@ -339,7 +393,9 @@
   </div>
 </div>
 
-<!-- MODAL: Personnel edit/create -->
+<!-- ============================================================
+     MODAL: Personnel edit/create
+============================================================ -->
 <div id="modal-disp-person" class="modal-overlay hidden">
   <div class="modal-box">
     <div class="modal-header">
@@ -357,7 +413,9 @@
   </div>
 </div>
 
-<!-- MODAL: CSV Import (shared) -->
+<!-- ============================================================
+     MODAL: CSV Import (shared) 
+============================================================ -->
 <div id="modal-import" class="modal-overlay hidden">
   <div class="modal-box modal-wide">
     <div class="modal-header">
@@ -376,6 +434,7 @@
 </div>
 
 <!-- ── SCRIPTS ──────────────────────────────────────────────── -->
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -389,6 +448,8 @@
 <script src="js/views/pca-pma.js"></script>
 <script src="js/views/pca-dispositivo.js"></script>
 <script src="js/views/pca-import.js"></script>
+<script src="js/views/pca-hospital.js"></script>
+<script src="js/views/pca-settings.js"></script>
 <script src="js/router.js"></script>
 <script>const AUTH_MODE = 'pca';</script>
 <script src="js/auth.js"></script>

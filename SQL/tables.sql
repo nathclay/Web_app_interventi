@@ -10,7 +10,10 @@ CREATE TABLE events (
   center_lng NUMERIC,
   default_zoom INTEGER DEFAULT 14,
   is_active BOOL DEFAULT FALSE NOT NULL,
- -- created_by UUID REFERENCES auth.users, TODO: when users will be enabled
+  notes_general TEXT,
+  notes_coordinators TEXT,
+  is_grid BOOL,
+  is_route BOOL,
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );

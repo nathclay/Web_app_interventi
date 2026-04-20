@@ -9,6 +9,7 @@ const PAGES = {
   soccorsi:     { label: 'Soccorsi',     mount: mountSoccorsi     },
   moduli: { label: 'Moduli', mount: mountModuli },
   pma:          { label: 'PMA',          mount: mountPMA          },
+  ospedalizzazioni: { label: 'Ospedalizzazioni', mount: mountOspedalizzazioni },
   dispositivo: { label: 'Dispositivo', mount: mountDispositivo },
   impostazioni: { label: 'Impostazioni', mount: mountImpostazioni },
 };
@@ -68,15 +69,4 @@ async function navigateTo(page) {
       btn.classList.toggle('active', btn.dataset.page === _currentPage);
     });
   }
-}
-
-
-/* ── STUB PAGE MOUNTS (replace with real implementations) ───── */
-
-function mountImpostazioni(container) {
-  container.innerHTML = `
-    <div class="page-shell">
-      <div class="page-header"><h2>Impostazioni</h2></div>
-      <div class="page-body"><div class="empty-state">In costruzione…</div></div>
-    </div>`;
 }

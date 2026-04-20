@@ -40,7 +40,7 @@ async function renderDispositivo() {
     // Fetch all personnel for this event
     const { data: personnel, error: perError } = await db
         .from('personnel')
-        .select('id, name, surname, comitato, number, qualifications, role, resource_fk:resource')
+        .select('id, name, surname, comitato, number, qualifications, role, resource_fk:resource, present')
         .eq('event_id', PCA.eventId)
         .order('surname');
 
@@ -116,7 +116,15 @@ async function renderDispositivo() {
     sections.push(buildPoolSection('Non assegnati', unassigned));
 
     body.innerHTML = sections.join('') ||
-        '<div class="empty-state">Nessun personale registrato</div>';
+      '<div class="empty-state">Nessun personale registrato</div>';
+
+    document.querySelectorAll('.disp-person[data-present="true"]').forEach(el => {
+      el.closest('td')?.classList.add('td-present');
+    });
+    document.querySelectorAll('.disp-person[data-present="false"]').forEach(el => {
+      el.closest('td')?.classList.add('td-absent');
+    });
+
     initDispResize();
 }
 
@@ -269,19 +277,24 @@ const PERSONNEL_ROLES = [
 function buildPersonCard(p, resourceId = null, suggestedRole = null) {
   if (!p) {
     if (!resourceId) return `<div class="disp-person disp-empty">—</div>`;
-    // Empty cell — click to create new person
     return `
       <div class="disp-person disp-empty disp-clickable"
         onclick="openPersonModal(null, '${resourceId}', '${suggestedRole || ''}')">
         <span style="font-size:16px;color:var(--border-bright);">+</span>
       </div>`;
   }
+  const bg = p.present === true  ? 'rgba(63,185,80,0.12)'
+           : p.present === false ? 'rgba(226,75,74,0.12)'
+           : 'transparent';
+  const presentClass = p.present === true  ? 'disp-person-present'
+                   : p.present === false ? 'disp-person-absent'
+                   : '';
   return `
-    <div class="disp-person disp-clickable"
+    <div class="disp-person disp-clickable" data-present="${p.present}"
       onclick="openPersonModal('${p.id}')">
       <div class="disp-person-name">${p.surname} ${p.name}</div>
-      ${p.comitato    ? `<div class="disp-person-meta">${p.comitato}</div>` : ''}
-      ${p.number      ? `<div class="disp-person-meta">
+      ${p.comitato       ? `<div class="disp-person-meta">${p.comitato}</div>` : ''}
+      ${p.number         ? `<div class="disp-person-meta">
         <a href="tel:${p.number}" class="disp-phone" onclick="event.stopPropagation()">
           ${p.number}</a></div>` : ''}
       ${p.qualifications ? `<div class="disp-person-qual">${p.qualifications}</div>` : ''}
@@ -723,6 +736,15 @@ async function openPersonModal(personnelId, presetResourceId = null, presetRole 
       <label>Risorsa assegnata</label>
       <select id="dp-resource">${resOpts}</select>
     </div>
+    <div class="form-group">
+      <label>Presente</label>
+      <select id="dp-present">
+        <option value=""     ${person?.present === null  ? 'selected' : ''}>— Non specificato —</option>
+        <option value="true"  ${person?.present === true  ? 'selected' : ''}>✓ Presente</option>
+        <option value="false" ${person?.present === false ? 'selected' : ''}>✗ Assente</option>
+      </select>
+    </div>
+    <div id="dp-error" class="error-msg"></div>
     <div id="dp-error" class="error-msg"></div>`;
 
   const saveBtn = document.getElementById('disp-modal-save');
@@ -753,7 +775,8 @@ async function savePersonnel(personnelId) {
   const saveBtn = document.getElementById('disp-modal-save');
   saveBtn.disabled = true;
   saveBtn.textContent = 'Salvataggio...';
-
+  const val = document.getElementById('dp-present').value;
+  
   const payload = {
     name,
     surname,
@@ -764,6 +787,7 @@ async function savePersonnel(personnelId) {
     email:          document.getElementById('dp-email').value.trim() || null,
     qualifications: document.getElementById('dp-qualifications').value.trim() || null,
     resource:       document.getElementById('dp-resource').value || null,
+    present:        val === 'true' ? true : val === 'false' ? false : null,
   };
 
   let error;

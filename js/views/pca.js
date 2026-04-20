@@ -3,12 +3,16 @@
    Depends on: supabase.js, state.js, ui.js, auth.js
 ================================================================ */
 
-/* ── OWN STATE (no shared state.js needed) ─────────────────── */
+/* ── OWN STATE ─────────────────── */
+let _geoLayerDefs = [];
+let _geoLayerData = {};
+
 const PCA = {
   map:          null,
   markers:      {},
   incMarkers:   {},
   layers: { risorse: null, coordinatori: null, attivi: null, chiusi: null },  
+  geoLayers:    {},   
   activeLayers: new Set(['base', 'risorse', 'coordinatori', 'attivi']),
   allIncidents: [],
   allResources: [],
@@ -17,6 +21,7 @@ const PCA = {
   eventId:      null,
   operator:     null,   // the selected personnel (can be null if skipped)
   activeFilters: new Set(),  // null | 'free' | 'recent'
+  _baseTile:    null,
 };
 
 /* ── LAUNCH DASHBOARD ──────────────────────────────────────── */
@@ -49,16 +54,16 @@ async function loadPCAView() {
   });
  
   // Bottom bar
-  document.getElementById('btn-new-incident').addEventListener('click', openNewIncidentModal);
-  document.getElementById('btn-free-units').addEventListener('click', filterFreeUnits);
-  document.getElementById('btn-recent-pos').addEventListener('click', flyToRecentPositions);
-  document.getElementById('btn-search').addEventListener('click', focusMapSearch);
+  document.getElementById('btn-new-incident')?.addEventListener('click', openNewIncidentModal);
+  document.getElementById('btn-free-units')?.addEventListener('click', filterFreeUnits);
+  document.getElementById('btn-recent-pos')?.addEventListener('click', flyToRecentPositions);
+  document.getElementById('btn-search')?.addEventListener('click', focusMapSearch);
  
   // Map layer toggles
   document.querySelectorAll('.map-layer-btn').forEach(btn => {
     btn.addEventListener('click', () => toggleMapLayer(btn.dataset.layer, btn));
   });
- 
+
   // Panel resize
   initPanelResize();
  
@@ -71,7 +76,8 @@ async function loadPCAView() {
  
   // Map
   await initPCAMap(event);
- 
+  await loadGeoLayers();
+
   // Data
   await Promise.all([loadAllIncidents(), loadAllResources()]);
  
@@ -111,7 +117,7 @@ async function initPCAMap(event) {
  
   PCA.map = L.map('map', { zoomControl: true }).setView([lat, lng], zoom);
  
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  PCA._baseTile = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
     attribution: '© OpenStreetMap © CartoDB',
     subdomains: 'abcd',
     maxZoom: 19,
@@ -122,7 +128,167 @@ async function initPCAMap(event) {
   PCA.layers.attivi        = L.layerGroup().addTo(PCA.map);
   PCA.layers.chiusi        = L.layerGroup();
 }
- 
+
+async function loadGeoLayers() {
+  const tables = [
+    { key: 'route',   table: 'event_route',     label: 'Percorso',        },
+    { key: 'grid',    table: 'grid',             label: 'Griglia',         },
+    { key: 'fixed',   table: 'fixed_resources',  label: 'Risorse fisse',   },
+    { key: 'markers', table: 'markers_route',    label: 'Marker percorso', },
+    { key: 'poi',     table: 'event_poi',        label: 'POI',             },
+  ];
+
+  _geoLayerDefs = tables;
+  const togglesEl  = document.getElementById('geo-layer-toggles');
+  const sectionEl  = document.getElementById('geo-layers-section');
+  let anyVisible   = false;
+
+  for (const def of tables) {
+    const { data } = await db
+      .from(def.table)
+      .select('*')
+      .eq('event_id', PCA.eventId);
+
+    if (!data || data.length === 0) continue;
+    anyVisible = true;
+    _geoLayerData[def.key] = data;
+
+    const layer = buildGeoLayer(def, data);
+    PCA.geoLayers[def.key] = layer;
+
+    const color = GEO_STYLES[def.key]?.color || '#fff';
+    const row = document.createElement('div');
+    row.className = 'geo-layer-row';
+    row.innerHTML = `
+      <button class="map-layer-btn" data-geo="${def.key}"
+        style="border-left:3px solid ${color};"
+        onclick="toggleGeoLayer('${def.key}', this)">${def.label}</button>
+      <button class="geo-style-btn" title="Stile"
+        onclick="openGeoStyleModal('${def.key}','${def.label}')">⚙</button>`;
+    togglesEl?.appendChild(row);
+  }
+
+  if (anyVisible && sectionEl) sectionEl.style.display = '';
+}
+
+function buildGeoLayer(def, rows) {
+  const group = L.layerGroup();
+  const s     = GEO_STYLES[def.key];
+
+
+
+  rows.forEach(row => {
+    if (!row.geom) return;
+    const geom = typeof row.geom === 'string' ? JSON.parse(row.geom) : row.geom;
+    if (geom.crs) delete geom.crs;
+
+    if (def.key === 'route') {
+      L.geoJSON({ type: 'Feature', geometry: geom, properties: {} }, {
+        style: { color: s.color, weight: s.weight, opacity: s.opacity },
+      }).bindPopup(`<strong>${row.name || 'Percorso'}</strong>`).addTo(group);
+    }
+    else if (def.key === 'grid') {
+      L.geoJSON({ type: 'Feature', geometry: geom, properties: {} }, {
+        style: { color: s.color, weight: s.weight, opacity: s.opacity,
+                 fillOpacity: s.fillOpacity, fillColor: s.color },
+      }).bindPopup(`<strong>${row.label || '—'}</strong>`).addTo(group);
+    }
+    else if (def.key === 'fixed' || def.key === 'markers' || def.key === 'poi') {
+      if (!geom.coordinates) return;
+      const [lng, lat] = geom.coordinates;
+      const label = def.key === 'markers'
+        ? (row.km != null ? 'km ' + row.km : row.label || '—')
+        : (row.name || row.label || '—');
+      let icon;
+      if (s.markerType === 'label') {
+        const fontSize  = s.radius;        
+        const padding   = 10;
+        const boxW      = Math.max(40, label.length * (fontSize * 0.65) + padding * 2);
+        const boxH      = fontSize + 14;
+        const arrowY    = boxH + 1;
+        const arrowTip  = boxH + 10;
+        const totalH    = boxH + 10;
+        const safeLbl = label
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+        const svg = `
+          <svg xmlns="http://www.w3.org/2000/svg"
+            width="${boxW}" height="${totalH}"
+            viewBox="0 0 ${boxW} ${totalH}">
+            <rect x="1" y="1" width="${boxW-2}" height="${boxH}"
+              rx="5" fill="#161b22" stroke="${s.color}" stroke-width="2"
+              opacity="${s.opacity}"/>
+            <text x="${boxW/2}" y="${boxH/2+1}" text-anchor="middle"
+              dominant-baseline="middle" font-family="system-ui,sans-serif"
+              font-size="${fontSize}" font-weight="700" fill="${s.color}">
+              ${safeLbl}
+            </text>
+            <polygon
+              points="${boxW/2-6},${arrowY} ${boxW/2+6},${arrowY} ${boxW/2},${arrowTip}"
+              fill="${s.color}" opacity="${s.opacity}"/>
+          </svg>`;
+        icon = L.divIcon({
+          html: svg, className: '',
+          iconSize:    [boxW, totalH],
+          iconAnchor:  [boxW/2, totalH],
+          popupAnchor: [0, -totalH],
+        });
+      } else {
+        icon = L.divIcon({
+          html: `<div style="width:${s.radius*2}px;height:${s.radius*2}px;border-radius:50%;
+            background:${s.color};border:2px solid #0d1117;opacity:${s.opacity};"></div>`,
+          className: '',
+          iconSize:   [s.radius*2, s.radius*2],
+          iconAnchor: [s.radius, s.radius],
+        });
+      }
+      L.marker([lat, lng], { icon })
+        .bindPopup(`<strong>${label}</strong>`)
+        .addTo(group);
+    }
+  });
+  return group;
+}
+
+function toggleGeoLayer(key, btn) {
+  const layer = PCA.geoLayers[key];
+  if (!layer || !PCA.map) return;
+  if (PCA.map.hasLayer(layer)) {
+    PCA.map.removeLayer(layer);
+    btn.classList.remove('active');
+  } else {
+    PCA.map.addLayer(layer);
+    btn.classList.add('active');
+    console.log('added layer', key, 'layer size:', layer.getLayers().length);
+
+  }
+}
+
+function switchBasemap(style) {
+  if (!PCA.map || !PCA._baseTile) return;
+  PCA.map.removeLayer(PCA._baseTile);
+
+  const urls = {
+    voyager:   'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  };
+  const attributions = {
+    voyager:   '© OpenStreetMap © CartoDB',
+    satellite: '© Esri © USGS',
+  };
+
+  PCA._baseTile = L.tileLayer(urls[style], {
+    attribution: attributions[style],
+    maxZoom: 19,
+    subdomains: style === 'voyager' ? 'abcd' : '',
+  }).addTo(PCA.map);
+
+  // Make sure base tile is below everything
+  PCA._baseTile.bringToBack();
+}
+
 function resourceIcon(resource, status) {
   const colors = { free: '#3fb950', busy: '#f0883e', stopped: '#484f58' };
   const color  = colors[status] || colors.free;
@@ -228,6 +394,125 @@ function toggleMapLayer(layerName, btn) {
     btn.classList.add('active');
   }
 }
+
+/* ── MAP PANEL COLLAPSE ─────────────────────────────────────── */
+function toggleMapPanel() {
+  const body    = document.getElementById('map-ctrl-body');
+  const chevron = document.getElementById('map-ctrl-chevron');
+  const open    = body.style.display !== 'none';
+  body.style.display  = open ? 'none' : '';
+  chevron.textContent = open ? '▸' : '▾';
+}
+
+/* ── GEO LAYER STYLES ───────────────────────────────────────── */
+const GEO_STYLES = {
+  route:   { color: '#f0883e', weight: 3,    opacity: 0.8, fillOpacity: 0 },
+  grid:    { color: '#58a6ff', weight: 1.5,  opacity: 0.7, fillOpacity: 0.08 },
+  fixed:   { color: '#bc8cff', radius: 6,  opacity: 1, markerType: 'dot' },
+  markers: { color: '#ffffff', radius: 4,  opacity: 1, markerType: 'label' },
+  poi:     { color: '#ffa657', radius: 6,  opacity: 1, markerType: 'dot' },
+};
+
+function openGeoStyleModal(key, label) {
+  const s    = GEO_STYLES[key];
+  const isLine = key === 'route';
+  const isPoly = key === 'grid';
+  const isPt   = ['fixed','markers','poi'].includes(key);
+
+  document.getElementById('geo-style-title').textContent = `Stile — ${label}`;
+
+  document.getElementById('geo-style-body').innerHTML = `
+    <div class="form-group">
+      <label>Colore</label>
+      <input type="color" id="gs-color" value="${s.color}"
+        style="width:100%;height:36px;border:none;background:none;cursor:pointer;" />
+    </div>
+    ${(isLine) ? `
+    <div class="form-group">
+      <label>Spessore linea (${s.weight}px)</label>
+      <input type="range" id="gs-weight" min="1" max="10" step="0.5" value="${s.weight}"
+        oninput="this.previousElementSibling.textContent='Spessore linea ('+this.value+'px)'"
+        style="width:100%;" />
+    </div>` : ''}
+    ${(isPt) ? `
+    <div class="form-group">
+      <label>Tipo marker</label>
+      <div style="display:flex;gap:6px;">
+        <button type="button" class="pca-yn-btn ${s.markerType === 'dot'   ? 'active-yes' : ''}"
+          onclick="this.closest('.form-group').querySelectorAll('.pca-yn-btn').forEach(b=>b.classList.remove('active-yes'));this.classList.add('active-yes');document.getElementById('gs-marker-type').value='dot'">
+          Punto
+        </button>
+        <button type="button" class="pca-yn-btn ${s.markerType === 'label' ? 'active-yes' : ''}"
+          onclick="this.closest('.form-group').querySelectorAll('.pca-yn-btn').forEach(b=>b.classList.remove('active-yes'));this.classList.add('active-yes');document.getElementById('gs-marker-type').value='label'">
+          Etichetta
+        </button>
+      </div>
+      <input type="hidden" id="gs-marker-type" value="${s.markerType}" />
+    </div>
+    <div class="form-group">
+      <label id="gs-radius-label">${s.markerType === 'label' ? `Dimensione testo (${s.radius}px)` : `Dimensione punto (${s.radius}px)`}</label>
+      <input type="range" id="gs-radius" min="6" max="24" step="1" value="${s.radius}"
+        oninput="this.previousElementSibling.textContent=
+          (document.getElementById('gs-marker-type').value==='label'?'Dimensione testo':'Dimensione punto')
+          +' ('+this.value+'px)'"
+        style="width:100%;" />
+    </div>` : ''}
+    <div class="form-group">
+      <label>Opacità contorni (${Math.round(s.opacity * 100)}%)</label>
+      <input type="range" id="gs-opacity" min="0" max="1" step="0.05" value="${s.opacity}"
+        oninput="this.previousElementSibling.textContent='Opacità ('+Math.round(this.value*100)+'%)'"
+        style="width:100%;" />
+    </div>
+    ${(isPoly) ? `
+    <div class="form-group">
+      <label>Opacità riempimento (${Math.round(s.fillOpacity * 100)}%)</label>
+      <input type="range" id="gs-fill-opacity" min="0" max="1" step="0.05" value="${s.fillOpacity}"
+        oninput="this.previousElementSibling.textContent='Opacità riempimento ('+Math.round(this.value*100)+'%)'"
+        style="width:100%;" />
+    </div>` : ''}`;
+
+  document.getElementById('geo-style-save').onclick = () => applyGeoStyle(key);
+  openModal('modal-geo-style');
+}
+
+function applyGeoStyle(key) {
+  const s = GEO_STYLES[key];
+  s.color = document.getElementById('gs-color')?.value || s.color;
+  const w = document.getElementById('gs-weight');
+  const r = document.getElementById('gs-radius');
+  const o = document.getElementById('gs-opacity');
+  const f = document.getElementById('gs-fill-opacity');
+  const mt = document.getElementById('gs-marker-type');
+  if (mt) s.markerType = mt.value;
+  if (w) s.weight      = parseFloat(w.value);
+  if (r) s.radius      = parseFloat(r.value);
+  if (o) s.opacity     = parseFloat(o.value);
+  if (f) s.fillOpacity = parseFloat(f.value);
+
+  // Rebuild the layer with new styles
+  const layer = PCA.geoLayers[key];
+  const wasOn = layer && PCA.map.hasLayer(layer);
+
+  // Find the raw data and rebuild
+  const def = _geoLayerDefs.find(d => d.key === key);
+  const data = _geoLayerData[key];
+  if (!def || !data) { closeModal('modal-geo-style'); return; }
+
+  if (layer) {
+    PCA.map.removeLayer(layer);
+    layer.clearLayers();
+  }
+
+  const newLayer = buildGeoLayer(def, data);
+  PCA.geoLayers[key] = newLayer;
+  if (wasOn) PCA.map.addLayer(newLayer);
+
+  // Update color indicator on button
+  const btn = document.querySelector(`[data-geo="${key}"]`);
+  if (btn) btn.style.borderLeftColor = s.color;
+
+  closeModal('modal-geo-style');
+}
  
 /* ── INCIDENTS ─────────────────────────────────────────────── */
 async function loadAllIncidents() {
@@ -262,6 +547,10 @@ async function loadAllIncidents() {
 }
  
 function renderIncidentPanels() {
+  const activeEl = document.getElementById('badge-active-count');
+  const closedEl = document.getElementById('badge-closed-count');
+  if (!activeEl || !closedEl) return;  // ← not on home page, skip
+
   const active = PCA.allIncidents.filter(i =>
     ['open', 'in_progress'].includes(i.status)
   );
@@ -471,9 +760,12 @@ function buildAssessment(inc, a) {
         ${a.blood_pressure ? `<div class="vital-item"><strong>${a.blood_pressure}</strong>PA</div>` : ''}
         ${a.temperature    ? `<div class="vital-item"><strong>${a.temperature}°</strong>Temp</div>` : ''}
         ${a.gcs_total      ? `<div class="vital-item"><strong>${a.gcs_total}</strong>GCS</div>` : ''}
+        ${a.hgt            ? `<div class="vital-item"><strong>${a.hgt}</strong>HGT</div>` : ''}
+        ${a.iv_access != null ? `<div class="vital-item"><strong>${yn(a.iv_access)}</strong>Acc. venoso</div>` : ''}
+
       </div>
       <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:default;"
-        title="${a.description ?? ''}">${a.description ?? '—'}</td>
+        title="${a.description ?? ''}">Descr: ${a.description ?? '—'}</td>
     </div>`;
 }
 
@@ -725,7 +1017,7 @@ async function confirmCloseIncident(incidentId) {
     .update({ outcome, released_at: new Date().toISOString() })
     .eq('incident_id', incidentId)
     .in('outcome', ['en_route_to_incident','treating',
-                    'en_route_to_pma','en_route_to_hospital']);
+                    'en_route_to_pma','en_route_to_hospital', 'reporting']);
 
   if (error) { errEl.textContent = error.message; return; }
   showToast('Soccorso chiuso ✓', 'success');
@@ -817,7 +1109,7 @@ let _niMarker = null;
 async function openNewIncidentModal() {
   // Reset state
   Object.assign(NI_FORM, {
-    conscious: null, respiration: null, circulation: null,
+    conscious: true, respiration: true, circulation: true,
     walking: null, minor_injuries: null, triage: null, iv_access: null
   });
   _niAge = null; _niGender = null; _niLat = null; _niLng = null;
@@ -842,15 +1134,18 @@ async function openNewIncidentModal() {
         <input type="text" id="ni-patient-id" placeholder="—" />
       </div>
     </div>
-
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
       <div class="form-group">
         <label>Età apparente</label>
         <div style="display:flex;align-items:center;justify-content:space-between;
           border:1px solid var(--border-bright);border-radius:var(--radius);
           background:var(--bg);height:38px;padding:0 10px;">
-          <span id="ni-age-display" style="font-size:15px;font-weight:700;
-            color:var(--text-primary);">—</span>
+          <input id="ni-age-display" type="number" min="0" max="120"
+            placeholder="—"
+            oninput="_niAge = parseInt(this.value) || null"
+            style="font-size:15px;font-weight:700;color:var(--text-primary);
+              width:50px;border:none;background:transparent;outline:none;-moz-appearance:textfield;"
+              class="no-spinner" />
           <div style="display:flex;gap:4px;">
             <button type="button" onclick="niAdjustAge(-10)"
               style="width:32px;height:28px;border-radius:var(--radius);
@@ -901,7 +1196,7 @@ async function openNewIncidentModal() {
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
-      ${[['circulation','Circolo',true],['walking','Cammina',true]].map(([field,label,def]) => `
+      ${[['circulation','Circolo',true],['walking','Cammina',null]].map(([field,label,def]) => `
         <div class="form-group">
           <label style="font-size:11px;color:var(--text-secondary);">${label}</label>
           <div style="display:flex;gap:6px;margin-top:4px;">
@@ -919,7 +1214,7 @@ async function openNewIncidentModal() {
         <div style="display:flex;gap:6px;margin-top:4px;">
           <button type="button" class="pca-yn-btn"
             onclick="niSetYN(this,'minor_injuries',false)" style="flex:1;">No</button>
-          <button type="button" class="pca-yn-btn active-yes"
+          <button type="button" class="pca-yn-btn"
             onclick="niSetYN(this,'minor_injuries',true)" style="flex:1;">Sì</button>
         </div>
       </div>
@@ -937,11 +1232,7 @@ async function openNewIncidentModal() {
     </div>
 
 
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px;">
-      <div class="form-group">
-        <label>FC</label>
-        <input type="number" id="ni-heart-rate" placeholder="—" min="0" max="300" />
-      </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px;">
       <div class="form-group">
         <label>FR</label>
         <input type="number" id="ni-breathing-rate" placeholder="—" min="0" max="60" />
@@ -951,12 +1242,45 @@ async function openNewIncidentModal() {
         <input type="number" id="ni-spo2" placeholder="—" min="0" max="100" />
       </div>
       <div class="form-group">
+        <label>FC</label>
+        <input type="number" id="ni-heart-rate" placeholder="—" min="0" max="300" />
+      </div>
+      <div class="form-group">
         <label>PA</label>
         <input type="text" id="ni-blood-pressure" placeholder="—" />
       </div>
-      <div class="form-group">
-        <label>Temp</label>
-        <input type="number" id="ni-temperature" placeholder="—" step="0.1" />
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <button type="button" id="ni-extra-toggle"
+        onclick="document.getElementById('ni-extra-params').style.display=
+          document.getElementById('ni-extra-params').style.display==='none'?'grid':'none';
+          this.textContent=this.textContent.includes('▸')?'▾ Meno parametri':'▸ Ulteriori parametri';"
+        style="font-size:11px;color:var(--blue);background:none;border:none;
+          cursor:pointer;padding:0;">▸ Ulteriori parametri</button>
+      <div id="ni-extra-params" style="display:none;grid-template-columns:repeat(4,1fr);
+        gap:8px;margin-top:8px;">
+        <div class="form-group">
+          <label>Temp</label>
+          <input type="number" id="ni-temperature" placeholder="—" step="0.1" />
+        </div>
+        <div class="form-group">
+          <label>GCS</label>
+          <input type="number" id="ni-gcs" placeholder="—" min="3" max="15" />
+        </div>
+        <div class="form-group">
+          <label>HGT</label>
+          <input type="text" id="ni-hgt" placeholder="—" />
+        </div>
+        <div class="form-group">
+          <label>Acc. venoso</label>
+          <div style="display:flex;gap:6px;margin-top:4px;">
+            <button type="button" class="pca-yn-btn"
+              onclick="niSetYN(this,'iv_access',false)" style="flex:1;">No</button>
+            <button type="button" class="pca-yn-btn"
+              onclick="niSetYN(this,'iv_access',true)" style="flex:1;">Sì</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1045,9 +1369,9 @@ function niSetTriage(triage) {
 }
 
 function niAdjustAge(delta) {
-  if (_niAge === null) _niAge = 30;
+  if (_niAge === null) _niAge = 50;
   else _niAge = Math.max(0, Math.min(120, _niAge + delta));
-  document.getElementById('ni-age-display').textContent = _niAge;
+  document.getElementById('ni-age-display').value = _niAge;
 }
 
 function niSelectGender(btn, gender) {
@@ -1068,8 +1392,8 @@ async function submitNewIncident() {
   const params = {
     p_event_id:              PCA.eventId,
     p_resource_id:           document.getElementById('ni-resource').value || null,
-    p_reporting_resource_id: null,
-    p_personnel_id:          null,
+    p_reporting_resource_id: PCA.resource?.id || null,    
+    p_personnel_id: PCA.operator?.id || null,
     p_incident_type:         null,
     p_lng:                   _niLng,
     p_lat:                   _niLat,
@@ -1087,14 +1411,14 @@ async function submitNewIncident() {
     p_spo2:                  parseInt(document.getElementById('ni-spo2').value)           || null,
     p_breathing_rate:        parseInt(document.getElementById('ni-breathing-rate').value) || null,
     p_blood_pressure:        document.getElementById('ni-blood-pressure').value           || null,
-    p_temperature:           parseFloat(document.getElementById('ni-temperature').value)  || null,
     p_triage:                NI_FORM.triage,
     p_description:           document.getElementById('ni-description').value.trim()       || null,
     p_clinical_notes:        null,
     p_location_description:  document.getElementById('ni-location-desc').value.trim()    || null,
-    p_iv_access:            NI_FORM.iv_access,
-    p_gcs_total:             null,
-    p_hgt :                   null,
+    p_temperature:           parseFloat(document.getElementById('ni-temperature').value) || null,
+    p_gcs_total:             parseInt(document.getElementById('ni-gcs').value)           || null,
+    p_hgt:                   document.getElementById('ni-hgt').value                     || null,
+    p_iv_access:             NI_FORM.iv_access,
   };
 
   try {

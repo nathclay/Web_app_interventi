@@ -119,7 +119,8 @@ BEGIN
     v_all_terminal
   FROM incident_responses ir
   JOIN resources r ON r.id = ir.resource_id
-  WHERE ir.incident_id = NEW.incident_id;
+  WHERE ir.incident_id = NEW.incident_id
+    AND ir.outcome != 'reporting';  -- ignore reporting responses for status calculation
   -- Determine new status
   UPDATE incidents SET status =
     CASE
@@ -257,7 +258,7 @@ BEGIN   -- Count how many responses this resource has with outcome = 'treating'
     AND outcome IN ('en_route_to_incident','treating', 'en_route_to_pma', 'en_route_to_hospital'); 
   INSERT INTO resources_current_status (
     event_id, resource_id, status, active_responses, last_response_at,
-    geom, location_updated_at, updated_at
+    updated_at
   )
   VALUES (
     NEW.event_id,
@@ -265,21 +266,11 @@ BEGIN   -- Count how many responses this resource has with outcome = 'treating'
     CASE WHEN v_active_count > 0 THEN 'busy'::resource_status_enum ELSE 'free'::resource_status_enum END,
     v_active_count,
     NEW.assigned_at,
-    NEW.geom,                 -- location at time of assignment
-    NEW.assigned_at,
     NOW()
   )
   ON CONFLICT (resource_id) DO UPDATE SET
     active_responses = v_active_count,
     last_response_at = NEW.assigned_at, 
-    geom    = CASE     -- Only update location if the response has a geom (active incident, not backdated)
-                            WHEN NEW.geom IS NOT NULL THEN NEW.geom 
-                            ELSE resources_current_status.geom 
-                          END,
-    location_updated_at = CASE 
-                            WHEN NEW.geom IS NOT NULL THEN NEW.assigned_at 
-                            ELSE resources_current_status.location_updated_at 
-                          END,
     status = CASE     -- Only flip to busy if not stopped — control room stop is never overridden
                WHEN resources_current_status.status = 'stopped'::resource_status_enum THEN 'stopped'::resource_status_enum
                WHEN v_active_count > 0 THEN 'busy'::resource_status_enum
