@@ -30,7 +30,7 @@ CREATE TABLE grid (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   event_id uuid REFERENCES events(id),
   label text,               
-  geom geometry(Multipolygon, 4326)
+  geom geometry(MultiPolygon, 4326)
 );
 ALTER TABLE grid ENABLE ROW LEVEL SECURITY;
 

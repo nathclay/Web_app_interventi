@@ -8,6 +8,9 @@ const LOCATION_THROTTLE_MS = 15000; // max one insert per 15 seconds
 let lastLocationSent = 0;
 let watchId = null;
 
+const _locationSentCallbacks = [];
+function onLocationSent(cb) { _locationSentCallbacks.push(cb); }
+
 function startLocationTracking() {
   if (!('geolocation' in navigator)) {
     console.warn('Geolocation not available on this device.');
@@ -31,10 +34,12 @@ function stopLocationTracking() {
 async function onPosition(pos) {
   const now = Date.now();
   if (now - lastLocationSent < LOCATION_THROTTLE_MS) return;
-  if (!STATE.isOnline) return; // no point trying if offline
+  if (!STATE.isOnline) return; 
   lastLocationSent = now;
 
   await insertLocation(pos.coords);
+  _locationSentCallbacks.forEach(cb => cb(pos.coords));  
+
 }
 
 // One-shot: get current position (used by incident form for geolocation)

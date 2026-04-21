@@ -166,6 +166,21 @@ function invalidateMap() {
   if (mapInstance) setTimeout(() => mapInstance.invalidateSize(), 50);
 }
 
+async function updateMapZone(lat, lng) {
+  if (!STATE.event?.is_grid) return;
+
+  const el = document.getElementById('map-sector-value');
+  if (!el) return;
+
+  const { data } = await db.rpc('get_zone_for_point', {
+    p_event_id: STATE.resource.event_id,
+    p_lng:      lng,
+    p_lat:      lat,
+  });
+
+  el.textContent = (data && data.length > 0) ? data[0].grid_label : '—';
+}
+
 async function refreshMapInfoBar() {
   const ev = STATE.event;
 
@@ -192,6 +207,7 @@ async function refreshMapInfoBar() {
         document.getElementById('map-position-time').textContent =
           new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
         await refreshMapMarkers();
+        await updateMapZone(pos.coords.latitude, pos.coords.longitude);  
         showToast('Posizione inviata ✓', 'success');
       } catch (_) {
         showToast('GPS non disponibile', 'error');
@@ -215,7 +231,16 @@ async function refreshMapInfoBar() {
   const sectorRow = document.getElementById('map-sector-row');
   if (ev?.is_grid) {
     sectorRow.style.display = '';
-    document.getElementById('map-sector-value').textContent = '…';
+    // Seed with last known position
+    if (pos?.geom?.coordinates) {
+      const [lng, lat] = pos.geom.coordinates;
+      updateMapZone(lat, lng);
+    }
+    // Register GPS callback once
+    if (!sectorRow.dataset.zoneWired) {
+      sectorRow.dataset.zoneWired = '1';
+      onLocationSent(coords => updateMapZone(coords.latitude, coords.longitude));
+    }
   }
 
   // Row 3 — km (is_route)
