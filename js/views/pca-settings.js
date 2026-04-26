@@ -355,7 +355,7 @@ async function uploadGeoJSON(key, table, primaryProp) {
       if (table === 'markers_route')  return { ...base, km:    props.km    || 0, label: props.label || null };
       if (table === 'fixed_resources')return { ...base, label: props.label || props.name || null };
       if (table === 'grid')           return { ...base, label: props.label || props.name || null };
-      if (table === 'event_poi')      return { ...base, name:  props.name  || '—', poi_type: props.poi_type || null, properties: props };
+      if (table === 'event_poi')      return { ...base, label:  props.label  || '—', poi_type: props.poi_type || null, properties: props };
       return base;
     });
 

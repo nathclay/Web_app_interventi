@@ -235,41 +235,70 @@
           padding:10px 16px;
           display:flex;
           flex-direction:column;
-          gap:6px;">
-          <!-- Row 1: last position sent -->
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-            <div id="map-position-label" style="
-              font-size:12px;font-weight:600;color:var(--text-secondary);">
-              📍 Posizione inviata al PCA alle: <span id="map-position-time" style="color:var(--text-primary);">—</span>
-            </div>
+          gap:8px;">
+           <!-- Row 1: send position + cerca -->
+          <div style="display:flex;gap:8px;">
+            <button id="btn-map-send-position" style="
+              flex:1;padding:9px 12px;border-radius:var(--radius);
+              border:1.5px solid var(--border-bright);background:var(--bg-card);
+              color:var(--text-primary);font-size:12px;font-weight:600;
+              font-family:var(--font);cursor:pointer;text-align:center;">
+              📍 Invia posizione
+            </button>
             <button id="btn-map-cerca" style="
-              padding:6px 14px;border-radius:20px;
+              flex:1;padding:9px 12px;border-radius:var(--radius);
               border:1.5px solid var(--blue);background:var(--blue-dim);
               color:#1060cc;font-size:12px;font-weight:700;
-              font-family:var(--font);cursor:pointer;white-space:nowrap;
-              flex-shrink:0;">
-              Cerca 📡
+              font-family:var(--font);cursor:pointer;text-align:center;">
+              🔍 Cerca
             </button>
           </div>
-          <button id="btn-map-send-position" style="
-            width:100%;padding:9px 12px;border-radius:var(--radius);
-            border:1.5px solid var(--border-bright);background:var(--bg-card);
-            color:var(--text-primary);font-size:12px;font-weight:600;
-            font-family:var(--font);cursor:pointer;text-align:center;">
-            📍 Invia posizione attuale
-          </button>
-          <!-- Row 2: sector (is_grid only) -->
-          <div id="map-sector-row" style="display:none;
-            font-size:12px;font-weight:600;color:var(--text-secondary);">
-            🗂 Ti trovi nel settore: <span id="map-sector-value"
-              style="color:var(--text-primary);">—</span>
+          <!-- Row 2: last location -->
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <div id="map-position-label" style="
+              font-size:14px;font-weight:600;color:var(--text-secondary);">
+              📍 Ultima posizione inviata alle: <span id="map-position-time" style="color:var(--text-primary);">—</span>
+            </div>
           </div>
-          <!-- Row 3: km (is_route only) -->
+          <!-- Row 3: sector (is_grid only) -->
+          <div id="map-sector-row" style="display:none;
+            align-items:center;justify-content:space-between;gap:8px;">
+            <div style="font-size:14px;font-weight:600;color:var(--text-secondary);">
+              🗂 Ti trovi nel settore: <span id="map-sector-value"
+                style="color:var(--text-primary);font-size:15px;">—</span>
+            </div>
+          </div>
+          <!-- Row 4: km (is_route only) -->
           <div id="map-km-row" style="display:none;
             font-size:12px;font-weight:600;color:var(--text-secondary);">
             📏 Sei vicino al km: <span id="map-km-value"
               style="color:var(--text-primary);">—</span>
           </div>
+
+          <!-- Row 5: cerca expanded panel (hidden by default) -->
+          <div id="map-cerca-panel" style="display:none;flex-direction:column;gap:8px;">
+              <div style="display:flex;gap:8px;">
+                <select id="cerca-grid-select" style="
+                  flex:1;padding:10px;border-radius:var(--radius);
+                  border:1.5px solid var(--border-bright);background:var(--bg-input);
+                  font-family:var(--font);font-size:13px;color:var(--text-primary);">
+                  <option value="">— Zona —</option>
+                </select>
+                <select id="cerca-poi-select" style="
+                  flex:1;padding:10px;border-radius:var(--radius);
+                  border:1.5px solid var(--border-bright);background:var(--bg-input);
+                  font-family:var(--font);font-size:13px;color:var(--text-primary);">
+                  <option value="">— Punto —</option>
+                </select>
+              </div>
+              <button id="btn-cerca-close" style="
+                width:100%;padding:8px;border-radius:var(--radius);
+                border:1px solid var(--border-bright);background:var(--bg-card);
+                color:var(--text-secondary);font-size:12px;font-weight:600;
+                font-family:var(--font);cursor:pointer;">
+                ✕ Chiudi ricerca
+              </button>
+            </div>
         </div>
         <!-- Map fills remaining space -->
         <div id="map" style="flex:1;min-height:0;"></div>

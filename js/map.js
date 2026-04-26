@@ -132,6 +132,9 @@ async function refreshMapMarkers() {
       mapInstance.setView([lat, lng], mapInstance.getZoom());
     }
   }
+  
+  await refreshEnRouteMarker();
+
 
   // Sector resources — coordinator only
   if (STATE.resource.resource_type !== 'LDC') return;
@@ -160,6 +163,76 @@ async function refreshMapMarkers() {
         .bindPopup(popup);
     }
   });
+}
+
+async function refreshEnRouteMarker() {
+  console.log('enroute check, incidents:', STATE.incidents?.length);
+
+  if (!mapInstance) return;
+
+  // Find any incident where this resource is en_route_to_incident
+  const enRouteInc = (STATE.incidents || []).find(i =>
+    (i.incident_responses || []).some(r =>
+      r.resource_id === STATE.resource.id &&
+      r.outcome === 'en_route_to_incident'
+    )
+  );
+  console.log('enroute incident found:', enRouteInc?.id, 'geom:', enRouteInc?.geom);
+
+  // Remove existing marker if no longer en route
+  if (!enRouteInc) {
+    if (mapMarkers['enroute']) {
+      mapInstance.removeLayer(mapMarkers['enroute']);
+      delete mapMarkers['enroute'];
+    }
+    return;
+  }
+
+  if (!enRouteInc.geom?.coordinates) return;
+  const [lng, lat] = enRouteInc.geom.coordinates;
+
+  const triageColors = { red: '#e53935', yellow: '#fdd835', green: '#43a047', white: '#bdbdbd' };
+  const color = triageColors[enRouteInc.current_triage] || '#1e7fff';
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+      <circle cx="16" cy="16" r="13" fill="${color}" stroke="#fff" stroke-width="3"/>
+      <text x="16" y="21" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">!</text>
+    </svg>`;
+
+  const icon = L.divIcon({ html: svg, className: '', iconSize: [32,32], iconAnchor: [16,16] });
+
+  const popup = `
+    <div style="font-family:system-ui;min-width:140px;">
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px;">
+        📍 Da raggiungere
+      </div>
+      <div style="font-size:12px;color:#666;margin-bottom:8px;">
+        ${enRouteInc.location_description || enRouteInc.incident_type || '—'}
+      </div>
+      <button onclick="openIncidentDetail('${enRouteInc.id}')" style="
+        width:100%;padding:7px;border-radius:6px;
+        background:#1e7fff;color:white;border:none;
+        font-size:12px;font-weight:700;cursor:pointer;">
+        Apri intervento
+      </button>
+    </div>`;
+
+  if (mapMarkers['enroute']) {
+    mapMarkers['enroute'].setLatLng([lat, lng]);
+    mapMarkers['enroute'].getPopup().setContent(popup);
+  } else {
+    mapMarkers['enroute'] = L.marker([lat, lng], { icon, zIndexOffset: 500 })
+      .addTo(mapInstance)
+      .bindPopup(popup);
+  }
+
+  // Fly to it on first load
+  if (!mapMarkers['enroute']._flownTo) {
+    mapInstance.setView([lat, lng], 16);
+    mapMarkers['enroute']._flownTo = true;
+    mapMarkers['enroute'].openPopup();
+  }
 }
 
 function invalidateMap() {
@@ -249,15 +322,6 @@ async function refreshMapInfoBar() {
     });
   }
 
-  // Cerca button
-  const cercaBtn = document.getElementById('btn-map-cerca');
-  if (cercaBtn && !cercaBtn.dataset.wired) {
-    cercaBtn.dataset.wired = '1';
-    cercaBtn.addEventListener('click', () => {
-      showToast('Funzione non ancora disponibile', 'error');
-    });
-  }
-
   // Row 2 — sector (is_grid)
   const sectorRow = document.getElementById('map-sector-row');
   if (ev?.is_grid) {
@@ -289,6 +353,7 @@ async function refreshMapInfoBar() {
       onLocationSent(coords => updateMapKm(coords.latitude, coords.longitude));
     }
   }
+  await initCercaPanel();
 }
 
 async function loadEventGeoLayers() {
@@ -345,4 +410,91 @@ async function loadEventGeoLayers() {
       }
     });
   }
+}
+
+let _cercaGridLayer  = null;
+let _cercaPoiMarker  = null;
+
+async function initCercaPanel() {
+  const btn   = document.getElementById('btn-map-cerca');
+  const panel = document.getElementById('map-cerca-panel');
+  if (!btn || !panel) return;
+  if (btn.dataset.cercaWired) return;
+  btn.dataset.cercaWired = '1';
+
+  const ev = STATE.event;
+
+  // Fetch grid labels
+  if (ev?.is_grid) {
+    const { data: cells } = await db
+      .from('grid')
+      .select('id, label, geom')
+      .eq('event_id', STATE.resource.event_id)
+      .order('label');
+
+    const gridSelect = document.getElementById('cerca-grid-select');
+    if (cells?.length) {
+      gridSelect.innerHTML = '<option value="">— Seleziona zona —</option>' +
+        cells.map(c => `<option value="${c.id}">${c.label}</option>`).join('');
+
+      gridSelect.addEventListener('change', () => {
+        const cell = cells.find(c => c.id === gridSelect.value);
+        if (!cell) return;
+        clearCercaLayers();
+        const geom = typeof cell.geom === 'string' ? JSON.parse(cell.geom) : cell.geom;
+        if (geom.crs) delete geom.crs;
+        _cercaGridLayer = L.geoJSON({ type:'Feature', geometry: geom }, {
+          style: { color: '#1e7fff', weight: 3, opacity: 1, fillOpacity: 0.2, fillColor: '#1e7fff' }
+        }).addTo(mapInstance);
+        mapInstance.fitBounds(_cercaGridLayer.getBounds(), { padding: [20, 20] });
+      });
+    }
+  }
+
+  // Fetch POI
+  const { data: pois, error: poiError } = await db
+    .from('event_poi')
+    .select('id, label, poi_type, geom')
+    .eq('event_id', STATE.resource.event_id)
+    .order('label');
+
+  const poiSelect = document.getElementById('cerca-poi-select');
+  if (pois?.length) {
+    poiSelect.innerHTML = '<option value="">— Seleziona punto —</option>' +
+      pois.map(p => `<option value="${p.id}">${p.label}</option>`).join('');
+
+    poiSelect.addEventListener('change', () => {
+      const poi = pois.find(p => p.id === poiSelect.value);
+      if (!poi?.geom?.coordinates) return;
+      clearCercaLayers();
+      const [lng, lat] = poi.geom.coordinates;
+      _cercaPoiMarker = L.marker([lat, lng])
+        .addTo(mapInstance)
+        .bindPopup(`<strong>${poi.label}</strong>`)
+        .openPopup();
+      mapInstance.setView([lat, lng], 17);
+    });
+  }
+
+  // Toggle panel open/close
+  btn.addEventListener('click', () => {
+    const isOpen = panel.style.display === 'flex';
+    panel.style.display = isOpen ? 'none' : 'flex';
+    panel.style.flexDirection = 'column';
+    if (isOpen) clearCercaLayers();
+  });
+
+  // Close button
+  document.getElementById('btn-cerca-close')
+    ?.addEventListener('click', () => {
+      panel.style.display = 'none';
+      clearCercaLayers();
+      document.getElementById('cerca-grid-select').value = '';
+      document.getElementById('cerca-poi-select').value = '';
+    });
+}
+
+function clearCercaLayers() {
+  if (_cercaGridLayer) { mapInstance.removeLayer(_cercaGridLayer); _cercaGridLayer = null; }
+  if (_cercaPoiMarker) { mapInstance.removeLayer(_cercaPoiMarker); _cercaPoiMarker = null; }
 }

@@ -894,7 +894,7 @@ async function openIncidentDetail(incidentId) {
     .find(r => r.resource_id === STATE.resource.id);
   const myOutcome = myDetailResponse?.outcome;
   titleEl.textContent =
-    myOutcome === 'en_route_to_incident' ? 'In arrivo' :
+    myOutcome === 'en_route_to_incident' ? 'Da raggiungere' :
     ['treating', 'en_route_to_pma', 'en_route_to_hospital'].includes(myOutcome) ? 'In corso' :
     'Chiuso';
   titleEl.dataset.incidentId = incidentId;

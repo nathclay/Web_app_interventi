@@ -40,7 +40,7 @@ CREATE TABLE event_poi (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   event_id uuid REFERENCES events(id),
   poi_type text,   -- TODO: create enum list          
-  name text NOT NULL,
+  label text NOT NULL,
   properties jsonb,
   geom geometry(Point, 4326)
 );
