@@ -97,12 +97,6 @@ async function initMap() {
   mapInstance = L.map('map', {
     zoomControl:     true,
     attributionControl: true,
-    rotate:          true,
-    touchRotate:     true,
-    bearing:         90,        
-    rotateControl: {
-      closeOnZeroBearing: false
-    },
   }).setView([lat, lng], zoom);
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
@@ -398,7 +392,72 @@ async function loadEventGeoLayers() {
         .addTo(mapInstance);
 
     });
+
+    if (data?.length) addGridAxisLabels(data, mapInstance);  
   }
+}
+
+function addGridAxisLabels(cells, map) {
+  const TOLERANCE = 0.0001;
+
+  // Compute centroid for each cell
+  const cellData = cells.map(row => {
+    const geom = typeof row.geom === 'string' ? JSON.parse(row.geom) : row.geom;
+    if (geom.crs) delete geom.crs;
+    const b = L.geoJSON({ type: 'Feature', geometry: geom }).getBounds();
+    return {
+      lat: (b.getNorth() + b.getSouth()) / 2,
+      lng: (b.getEast()  + b.getWest())  / 2,
+      north: b.getNorth(),
+      west:  b.getWest(),
+    };
+  });
+
+  // Unique columns by longitude, sorted west→east → A, B, C...
+  const uniqueLngs = [...new Set(
+    cellData.map(c => Math.round(c.lng / TOLERANCE) * TOLERANCE)
+  )].sort((a, b) => a - b);
+
+  // Unique rows by latitude, sorted north→south → 1, 2, 3...
+  const uniqueLats = [...new Set(
+    cellData.map(c => Math.round(c.lat / TOLERANCE) * TOLERANCE)
+  )].sort((a, b) => b - a);
+
+  const gridNorth = Math.max(...cellData.map(c => c.north));
+  const gridWest  = Math.min(...cellData.map(c => c.west));
+
+  const labelStyle = `
+    font-size:11px;font-weight:700;color:var(--text-secondary, #888);
+    font-family:system-ui,sans-serif;white-space:nowrap;`;
+
+  // Letters along the top
+  uniqueLngs.forEach((lng, i) => {
+    const letter = String.fromCharCode(65 + i); // A=65
+    L.marker([gridNorth, lng], {
+      icon: L.divIcon({
+        className: '',
+        html: `<div style="${labelStyle}">${letter}</div>`,
+        iconSize:   [20, 16],
+        iconAnchor: [10, -4],  // sits just above the top edge
+      }),
+      interactive: false,
+      zIndexOffset: -200,
+    }).addTo(map);
+  });
+
+  // Numbers along the left
+  uniqueLats.forEach((lat, i) => {
+    L.marker([lat, gridWest], {
+      icon: L.divIcon({
+        className: '',
+        html: `<div style="${labelStyle}">${i + 1}</div>`,
+        iconSize:   [20, 16],
+        iconAnchor: [24, 8],   // sits just left of the west edge
+      }),
+      interactive: false,
+      zIndexOffset: -200,
+    }).addTo(map);
+  });
 }
 
 let _cercaGridLayer  = null;

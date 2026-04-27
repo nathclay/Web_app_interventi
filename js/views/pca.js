@@ -216,11 +216,6 @@ async function initPCAMap(event) {
     attribution: '© OpenStreetMap © CartoDB',
     subdomains: 'abcd',
     maxZoom: 19,
-    zoomControl:   true,
-    rotate:        true,
-    touchRotate:   true,
-    bearing:         90,        
-    rotateControl: { closeOnZeroBearing: false },
   }).addTo(PCA.map);
  
   PCA.layers.risorse       = L.layerGroup().addTo(PCA.map);
