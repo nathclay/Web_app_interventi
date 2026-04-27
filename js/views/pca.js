@@ -224,6 +224,69 @@ async function initPCAMap(event) {
   PCA.layers.chiusi        = L.layerGroup();
 }
 
+function addGridAxisLabels(cells, map) {
+  const TOLERANCE = 0.0001;
+
+  // Compute centroid for each cell
+  const cellData = cells.map(row => {
+    const geom = typeof row.geom === 'string' ? JSON.parse(row.geom) : row.geom;
+    if (geom.crs) delete geom.crs;
+    const b = L.geoJSON({ type: 'Feature', geometry: geom }).getBounds();
+    return {
+      lat: (b.getNorth() + b.getSouth()) / 2,
+      lng: (b.getEast()  + b.getWest())  / 2,
+      north: b.getNorth(),
+      west:  b.getWest(),
+    };
+  });
+
+  // Unique columns by longitude, sorted west→east → A, B, C...
+  const uniqueLngs = [...new Set(
+    cellData.map(c => Math.round(c.lng / TOLERANCE) * TOLERANCE)
+  )].sort((a, b) => a - b);
+
+  // Unique rows by latitude, sorted north→south → 1, 2, 3...
+  const uniqueLats = [...new Set(
+    cellData.map(c => Math.round(c.lat / TOLERANCE) * TOLERANCE)
+  )].sort((a, b) => b - a);
+
+  const gridNorth = Math.max(...cellData.map(c => c.north));
+  const gridWest  = Math.min(...cellData.map(c => c.west));
+
+  const labelStyle = `
+    font-size:11px;font-weight:700;color:var(--text-secondary, #888);
+    font-family:system-ui,sans-serif;white-space:nowrap;`;
+
+  // Letters along the top
+  uniqueLngs.forEach((lng, i) => {
+    const letter = String.fromCharCode(65 + i); // A=65
+    L.marker([gridNorth, lng], {
+      icon: L.divIcon({
+        className: '',
+        html: `<div style="${labelStyle}">${letter}</div>`,
+        iconSize:   [20, 16],
+        iconAnchor: [10, -4],  // sits just above the top edge
+      }),
+      interactive: false,
+      zIndexOffset: -200,
+    }).addTo(map);
+  });
+
+  // Numbers along the left
+  uniqueLats.forEach((lat, i) => {
+    L.marker([lat, gridWest], {
+      icon: L.divIcon({
+        className: '',
+        html: `<div style="${labelStyle}">${i + 1}</div>`,
+        iconSize:   [20, 16],
+        iconAnchor: [24, 8],   // sits just left of the west edge
+      }),
+      interactive: false,
+      zIndexOffset: -200,
+    }).addTo(map);
+  });
+}
+
 async function loadGeoLayers() {
   const tables = [
     { key: 'route',   table: 'event_route',     label: 'Percorso',        },
@@ -247,6 +310,7 @@ async function loadGeoLayers() {
 
     const layer = buildGeoLayer(def, data);
     PCA.geoLayers[def.key] = layer;
+    if (def.key === 'grid') addGridAxisLabels(data, PCA.map);  
 
     const color = GEO_STYLES[def.key]?.color || '#fff';
     const row = document.createElement('div');
@@ -602,7 +666,7 @@ function incidentIcon(triage) {
   return L.divIcon({ html: svg, className: '', iconSize: [22, 22], iconAnchor: [11, 11], popupAnchor: [0, -14] });
 }
  
-function updateResourceMarker(resource, status, geom) {
+async function updateResourceMarker(resource, status, geom) {
   if (!PCA.map || !geom) return;
   const [lng, lat] = geom.coordinates;
   const layer = resource.resource_type === 'LDC'
@@ -611,11 +675,18 @@ function updateResourceMarker(resource, status, geom) {
 
   const fullResource = PCA.allResources.find(r => r.id === resource.id);
   const lastPos = formatTime(fullResource?.resources_current_status?.location_updated_at);
+  let zoneLabel = '';
+  if (PCA.event?.is_grid) {
+    const zone = await fetchZoneForPoint(PCA.eventId, lat, lng);
+    if (zone) zoneLabel = `<br><span style="font-size:11px;color:#58a6ff;">🗂 ${zone.grid_label}</span>`;
+  }
+
   const popup = `
     <strong style="font-size:13px;">${resource.resource}</strong><br>
     <span style="font-size:11px;color:#8b949e;">
-      Ultima pos: ${lastPos}
-    </span>
+        Ultima pos: ${lastPos}<br>
+        ${PCA.event?.is_grid ? `Settore: ${zoneLabel}<br>` : ''}
+      </span>
     <button onclick="openResourceDetailModal('${resource.id}')" class="map-popup-btn">
       Dettagli →
     </button>`;
