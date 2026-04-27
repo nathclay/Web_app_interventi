@@ -216,6 +216,11 @@ async function initPCAMap(event) {
     attribution: '© OpenStreetMap © CartoDB',
     subdomains: 'abcd',
     maxZoom: 19,
+    zoomControl:   true,
+    rotate:        true,
+    touchRotate:   true,
+    bearing:         90,        
+    rotateControl: { closeOnZeroBearing: false },
   }).addTo(PCA.map);
  
   PCA.layers.risorse       = L.layerGroup().addTo(PCA.map);
@@ -283,21 +288,6 @@ function buildGeoLayer(def, rows) {
                 fillOpacity: s.fillOpacity, fillColor: s.color },
       }).bindPopup(`<strong>${row.label || '—'}</strong>`).addTo(group);
 
-      if (row.label) {
-        // Compute center directly from geojson, not from rendered layer
-        const b = L.geoJSON({ type: 'Feature', geometry: geom }).getBounds();
-        const center = b.getCenter();
-        L.marker([center.lat, center.lng], {
-          icon: L.divIcon({
-            className: '',
-            html: `<div style="font-size:10px;font-weight:700;white-space:nowrap;color:${s.color};">${row.label}</div>`,
-            iconSize:   [80, 16],
-            iconAnchor: [40, 8],
-          }),
-          interactive: false,
-          zIndexOffset: -100,
-        }).addTo(group);
-      }
     }
     else if (def.key === 'fixed' || def.key === 'markers' || def.key === 'poi') {
       if (!geom.coordinates) return;

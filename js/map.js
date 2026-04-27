@@ -95,8 +95,14 @@ async function initMap() {
   const zoom = STATE.event.default_zoom || 14;
 
   mapInstance = L.map('map', {
-    zoomControl: true,
+    zoomControl:     true,
     attributionControl: true,
+    rotate:          true,
+    touchRotate:     true,
+    bearing:         90,        
+    rotateControl: {
+      closeOnZeroBearing: false
+    },
   }).setView([lat, lng], zoom);
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
@@ -132,7 +138,7 @@ async function refreshMapMarkers() {
       mapInstance.setView([lat, lng], mapInstance.getZoom());
     }
   }
-  
+
   await refreshEnRouteMarker();
 
 
@@ -166,7 +172,6 @@ async function refreshMapMarkers() {
 }
 
 async function refreshEnRouteMarker() {
-  console.log('enroute check, incidents:', STATE.incidents?.length);
 
   if (!mapInstance) return;
 
@@ -177,7 +182,6 @@ async function refreshEnRouteMarker() {
       r.outcome === 'en_route_to_incident'
     )
   );
-  console.log('enroute incident found:', enRouteInc?.id, 'geom:', enRouteInc?.geom);
 
   // Remove existing marker if no longer en route
   if (!enRouteInc) {
@@ -393,21 +397,6 @@ async function loadEventGeoLayers() {
       }).bindPopup(`<strong>${row.label || '—'}</strong>`)
         .addTo(mapInstance);
 
-      // Label at bottom-right of cell
-      if (row.label) {
-        const b = layer.getBounds();
-        const center = b.getCenter();
-        L.marker([center.lat, center.lng], {
-          icon: L.divIcon({
-            className: '',
-            html: `<div style="font-size:10px;font-weight:700;white-space:nowrap;">${row.label}</div>`,
-            iconSize:   [80, 16],
-            iconAnchor: [25, 16],
-          }),
-          interactive: false,
-          zIndexOffset: -100,
-        }).addTo(mapInstance);  
-      }
     });
   }
 }
