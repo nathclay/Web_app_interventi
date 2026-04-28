@@ -194,6 +194,36 @@ async function onDispositivoChange() {
   if (document.getElementById('disp-body')) await renderDispositivo();
 }
 
+// Convert session number to date label
+function sessionLabel(n) {
+  const start = PCA.event?.start_time;
+  if (!start) return `Giornata ${n}`;
+  const d = new Date(start);
+  d.setDate(d.getDate() + (n - 1));
+  return d.toLocaleDateString('it-IT', { weekday:'short', day:'numeric', month:'long' });
+}
+
+// Build the session dropdown HTML — pass current selected value and callback name
+function buildSessionBar(selected, callbackName) {
+  const max = PCA.event?.current_session || 1;
+  if (max <= 1) return '';
+  const opts = Array.from({ length: max }, (_, i) => i + 1)
+    .map(s => `<option value="${s}" ${s === selected ? 'selected' : ''}>${sessionLabel(s)}</option>`)
+    .join('');
+  return `
+    <div style="display:flex;align-items:center;gap:8px;padding:0 0 12px;">
+      <label style="font-size:12px;font-weight:600;color:#8b949e;">Giornata:</label>
+      <select onchange="${callbackName}(parseInt(this.value))"
+        style="padding:5px 10px;border-radius:var(--radius);
+          border:1.5px solid var(--border-bright);background:#161b22;
+          color:#e6edf3;font-family:var(--font);font-size:13px;
+          cursor:pointer;color-scheme:dark;">
+        ${opts}
+        <option value="-1" ${selected === -1 ? 'selected' : ''}>Tutte le giornate</option>
+      </select>
+    </div>`;
+}
+
 /* ================================================================
    MAP — SETUP
    initPCAMap          — creates the Leaflet instance and base layers.
@@ -1461,6 +1491,7 @@ async function submitNewIncident() {
     p_gcs_total:             parseInt(document.getElementById('ni-gcs').value)           || null,
     p_hgt:                   document.getElementById('ni-hgt').value                     || null,
     p_iv_access:             NI_FORM.iv_access,
+    p_session: PCA.event?.current_session || 1,
   };
 
   try {

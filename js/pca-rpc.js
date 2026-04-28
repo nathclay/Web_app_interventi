@@ -29,13 +29,14 @@ async function fetchPCAIncidents(eventId) {
     .select(`
       id, incident_type, status, current_triage,
       patient_name, patient_identifier, patient_age,
-      created_at, updated_at, geom, description,
+      created_at, updated_at, geom, description, session,
       incident_responses(
         id, outcome, resource_id,
         resources!incident_responses_resource_id_fkey(resource, resource_type)
       )
     `)
     .eq('event_id', eventId)
+    .eq('session', PCA.event?.current_session || 1)
     .not('status', 'in', '("cancelled")')
     .order('updated_at', { ascending: false });
 
@@ -47,13 +48,13 @@ async function fetchPCAIncidents(eventId) {
    Full query including assessments and patient_gender.
    Heavier — only called when user navigates to Soccorsi page.
 ---------------------------------------------------------------- */
-async function fetchSoccorsiIncidents(eventId) {
-  const { data, error } = await db
+async function fetchSoccorsiIncidents(eventId, session = null) {
+  let query = db
     .from('incidents')
     .select(`
       id, incident_type, status, current_triage,
       patient_name, patient_identifier, patient_age, patient_gender,
-      created_at, updated_at, description,
+      created_at, updated_at, description, session,
       incident_responses(
         id, outcome, assigned_at, released_at,
         resources!incident_responses_resource_id_fkey(id, resource, resource_type)
@@ -70,10 +71,52 @@ async function fetchSoccorsiIncidents(eventId) {
     .not('status', 'eq', 'cancelled')
     .order('created_at', { ascending: false });
 
+  if (session !== null) query = query.eq('session', session);
+
+  const { data, error } = await query;
   if (error) { console.error('fetchSoccorsiIncidents:', error); return []; }
   return data || [];
 }
 
+async function incrementSession(eventId) {
+  // Increment session counter
+  const { data: ev, error: fetchErr } = await db
+    .from('events')
+    .select('current_session')
+    .eq('id', eventId)
+    .single();
+  if (fetchErr) { console.error('incrementSession fetch:', fetchErr); return null; }
+
+  const newSession = (ev.current_session || 1) + 1;
+
+  const { error: updateErr } = await db
+    .from('events')
+    .update({ current_session: newSession })
+    .eq('id', eventId);
+  if (updateErr) { console.error('incrementSession update:', updateErr); return null; }
+
+  return newSession;
+}
+
+async function wipeResourcePositions(eventId) {
+  // First get resource IDs for this event
+  const { data: resources } = await db
+    .from('resources')
+    .select('id')
+    .eq('event_id', eventId);
+
+  if (!resources?.length) return true;
+
+  const resourceIds = resources.map(r => r.id);
+
+  const { error } = await db
+    .from('resources_current_status')
+    .delete()
+    .in('resource_id', resourceIds);
+
+  if (error) { console.error('wipeResourcePositions:', error); return false; }
+  return true;
+}
 
 /* ================================================================
    RESOURCES
@@ -209,12 +252,13 @@ async function fetchResourceCrew(resourceId) {
 async function fetchResourceHistory(resourceId) {
   const { data, error } = await db
     .from('incident_responses')
-    .select('incident_id, outcome, assigned_at, incidents(incident_type, current_triage, status)')
+    .select('incident_id, outcome, assigned_at, incidents(incident_type, current_triage, status, session)')
     .eq('resource_id', resourceId)
     .order('assigned_at', { ascending: false });
 
   if (error) { console.error('fetchResourceHistory:', error); return []; }
-  return data || [];
+  const currentSession = PCA.event?.current_session || 1;
+  return (data || []).filter(r => r.incidents?.session === currentSession);
 }
 
 
@@ -224,14 +268,14 @@ async function fetchResourceHistory(resourceId) {
    Moved here to centralise all DB access.
 ================================================================ */
 
-async function fetchPCAPMAIncoming(pmaId) {
+async function fetchPCAPMAIncoming(pmaId, session = null) {
   const { data, error } = await db
     .from('incident_responses')
     .select(`
       id, outcome, dest_pma_id, assigned_at,
       incidents(
         id, patient_name, patient_identifier, patient_age, patient_gender,
-        current_triage, description,
+        current_triage, description, session,
         patient_assessments(
           id, assessed_at, conscious, respiration, circulation,
           walking, minor_injuries, heart_rate, spo2, breathing_rate,
@@ -246,17 +290,19 @@ async function fetchPCAPMAIncoming(pmaId) {
     .order('assigned_at', { ascending: false });
 
   if (error) { console.error('fetchPCAPMAIncoming:', error); return []; }
-  return data || [];
+  const rows = data || [];
+  if (session !== null) return rows.filter(r => r.incidents?.session === session);
+  return rows;
 }
 
-async function fetchPCAPMAActive(pmaId) {
+async function fetchPCAPMAActive(pmaId, session = null) {
   const { data, error } = await db
     .from('incident_responses')
     .select(`
       id, outcome, assigned_at,
       incidents(
         id, patient_name, patient_identifier, patient_age, patient_gender,
-        current_triage, description,
+        current_triage, description, session,
         patient_assessments(
           id, assessed_at, conscious, respiration, circulation,
           walking, minor_injuries, heart_rate, spo2, breathing_rate,
@@ -269,18 +315,20 @@ async function fetchPCAPMAActive(pmaId) {
     .eq('outcome', 'treating')
     .order('assigned_at', { ascending: false });
 
-  if (error) { console.error('fetchPCAPMAActive:', error); return []; }
-  return data || [];
+  if (error) { console.error('fetchPCAPMAIncoming:', error); return []; }
+  const rows = data || [];
+  if (session !== null) return rows.filter(r => r.incidents?.session === session);
+  return rows;
 }
 
-async function fetchPCAPMAClosed(pmaId) {
+async function fetchPCAPMAClosed(pmaId, session = null) {
   const { data, error } = await db
     .from('incident_responses')
     .select(`
       id, outcome, released_at, dest_hospital, handoff_to_response_id,
       incidents(
         id, patient_name, patient_identifier, patient_age, patient_gender,
-        current_triage,
+        current_triage, session,
         patient_assessments(
           id, assessed_at, conscious, respiration, circulation,
           walking, minor_injuries, heart_rate, spo2, breathing_rate,
@@ -294,7 +342,9 @@ async function fetchPCAPMAClosed(pmaId) {
     .order('released_at', { ascending: false });
 
   if (error) { console.error('fetchPCAPMAClosed:', error); return []; }
-  return data || [];
+  const rows = data || [];
+  if (session !== null) return rows.filter(r => r.incidents?.session === session);
+  return rows;
 }
 
 /* ── PMA storico modal ─────────────────────────────────────────
@@ -345,7 +395,7 @@ async function fetchPCAStorico(incidentId) {
    HOSPITAL PAGE
 ================================================================ */
 
-async function fetchHospitalResponses(eventId) {
+async function fetchHospitalResponses(eventId, session = null) {
   const { data, error } = await db
     .from('incident_responses')
     .select(`
@@ -354,7 +404,7 @@ async function fetchHospitalResponses(eventId) {
       incident_id,
       incidents(
         id, patient_name, patient_identifier, patient_age,
-        patient_gender, current_triage
+        patient_gender, current_triage, session
       ),
       resources!incident_responses_resource_id_fkey(id, resource, resource_type)
     `)
@@ -363,7 +413,10 @@ async function fetchHospitalResponses(eventId) {
     .order('assigned_at', { ascending: false });
 
   if (error) { console.error('fetchHospitalResponses:', error); return []; }
-  return data || [];
+  const rows = data || [];
+  if (session !== null) return rows.filter(r => r.incidents?.session === session);
+  return rows;
+
 }
 
 /* Returns a map: incident_id → latest assessment object */
@@ -512,14 +565,28 @@ async function updateResourceDetails(resourceId, payload) {
 async function fetchEventSettings(eventId) {
   const { data, error } = await db
     .from('events')
-    .select('id, name, is_route, is_grid, notes_general, notes_coordinators')
+    .select('id, name, description, is_active, is_route, is_grid, current_session, notes_general, notes_coordinators')
     .eq('id', eventId)
     .single();
- 
   if (error) { console.error('fetchEventSettings:', error); return null; }
   return data;
 }
- 
+
+async function updateEventNameDesc(eventId, name, description) {
+  const { error } = await db
+    .from('events')
+    .update({ name, description })
+    .eq('id', eventId);
+  if (error) { console.error('updateEventNameDesc:', error); return false; }
+  return true;
+}
+
+async function closeAllMobileSessions() {
+  const { error } = await db.rpc('close_all_mobile_sessions');
+  if (error) { console.error('closeAllMobileSessions:', error); return false; }
+  return true;
+}
+
 /* ── Generic event field update ────────────────────────────────
    Used by saveEventToggle (single boolean) and saveNotes (single
    text field). Pass any subset of event columns as `fields`.

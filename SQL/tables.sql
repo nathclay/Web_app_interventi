@@ -14,6 +14,7 @@ CREATE TABLE events (
   notes_coordinators TEXT,
   is_grid BOOL,
   is_route BOOL,
+  current_session INT DEFAULT 1,
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
@@ -126,6 +127,7 @@ CREATE TABLE incidents (
   current_triage triage_enum,-- latest triage from patient_assessments
   status incident_status_enum NOT NULL DEFAULT 'open',
   initial_outcome response_outcome_enum,
+  session INT,
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );

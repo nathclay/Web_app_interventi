@@ -73,6 +73,14 @@ async function selectPMATab(pmaId) {
   await refreshPCAView();
 }
 
+function sessionLabel(sessionNum) {
+  const startTime = PCA.event?.start_time;
+  if (!startTime) return `Sessione ${sessionNum}`;
+  const date = new Date(startTime);
+  date.setDate(date.getDate() + (sessionNum - 1));
+  return date.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'long' });
+}
+
 /* ================================================================
    DATA & RENDER
    refreshPCAView    — fetches incoming/active/closed in parallel
@@ -82,7 +90,12 @@ async function selectPMATab(pmaId) {
    buildPMARow       — builds a single patient row, branching on
                        type for different column sets.
 ================================================================ */
-async function refreshPCAView() {
+let _pmaSession = null;
+
+async function refreshPCAView(filterSession) {
+  if (filterSession !== undefined) _pmaSession = filterSession;
+  const session = _pmaSession ?? PCA.event?.current_session ?? 1;
+
   const body = document.getElementById('pma-page-body');
   if (!body) return;
 
@@ -97,6 +110,7 @@ async function refreshPCAView() {
   ]);
 
   body.innerHTML =
+    buildSessionBar(session, 'refreshPCAView') +
     buildPMASection('📨 In arrivo',       incoming, 'incoming') +
     buildPMASection('🟢 In trattamento',  active,   'active')   +
     buildPMASection('✓ Chiusi',           closed,   'closed');

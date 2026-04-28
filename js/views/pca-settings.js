@@ -37,81 +37,141 @@ async function renderSettings() {
   const event = await fetchEventSettings(PCA.eventId);
   if (!event) { body.innerHTML = '<div class="empty-state">Errore nel caricamento</div>'; return; }
 
+  const currentSession = PCA.event?.current_session || 1;
+  const nextSession = currentSession + 1;
+  const nextLabel = sessionLabel(nextSession);
 
   body.innerHTML = `
-    <!-- ── TOGGLES ── -->
+  <div style="max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:16px;">
+
+    <!-- ── EVENTO ── -->
+    <div class="settings-card">
+      <div class="settings-card-title">Evento</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div class="form-group">
+          <label>Nome evento</label>
+          <input type="text" id="ev-name" value="${event.name || ''}" placeholder="Es. Maratona di Roma" />
+        </div>
+        <div class="form-group">
+          <label>Descrizione</label>
+          <input type="text" id="ev-description" value="${event.description || ''}" placeholder="Descrizione breve..." />
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggle-active" ${event.is_active ? 'checked' : ''}
+              onchange="saveEventToggle('is_active', this.checked)" />
+            <span class="toggle-slider"></span>
+          </label>
+          <span style="font-size:13px;font-weight:600;color:var(--text-primary);">Evento attivo</span>
+          <span style="font-size:13px;color:var(--text-primary);">— Con evento non attivo i moduli non possono mandare interventi</span>
+        </div>
+        <button class="btn-primary" style="width:auto;padding:6px 16px;"
+          onclick="saveEventNameDesc()">Salva</button>
+      </div>
+    </div>
+
+    <!-- ── MODALITÀ ── -->
     <div class="settings-card">
       <div class="settings-card-title">Modalità evento</div>
-      <div class="settings-row">
-        <div class="settings-row-label">
-          <span>Modalità gara</span>
-          <span class="settings-row-desc">Abilita funzionalità specifiche per eventi agonistici</span>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;
+          padding:12px;background:var(--bg);border-radius:var(--radius);
+          border:1px solid var(--border);">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text-primary);">Modalità gara</div>
+            <div style="font-size:13px;color:var(--text-primary);margin-top:2px;">Abilita percorso e km marker</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggle-gara" ${event.is_route ? 'checked' : ''}
+              onchange="saveEventToggle('is_route', this.checked)" />
+            <span class="toggle-slider"></span>
+          </label>
         </div>
-        <label class="toggle-switch">
-          <input type="checkbox" id="toggle-gara" ${event.is_route ? 'checked' : ''}
-            onchange="saveEventToggle('is_route', this.checked)" />
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-      <div class="settings-row">
-        <div class="settings-row-label">
-          <span>Modalità griglia</span>
-          <span class="settings-row-desc">Abilita la griglia geografica sulla mappa</span>
+        <div style="display:flex;align-items:center;justify-content:space-between;
+          padding:12px;background:var(--bg);border-radius:var(--radius);
+          border:1px solid var(--border);">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text-primary);">Modalità griglia</div>
+            <div style="font-size:13px;color:var(--text-primary);margin-top:2px;">Abilita griglia geografica</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggle-griglia" ${event.is_grid ? 'checked' : ''}
+              onchange="saveEventToggle('is_grid', this.checked)" />
+            <span class="toggle-slider"></span>
+          </label>
         </div>
-        <label class="toggle-switch">
-          <input type="checkbox" id="toggle-griglia" ${event.is_grid ? 'checked' : ''}
-            onchange="saveEventToggle('is_grid', this.checked)" />
-          <span class="toggle-slider"></span>
-        </label>
       </div>
     </div>
 
-    <!-- ── NOTES ── -->
+    <!-- ── NOTE ── -->
     <div class="settings-card">
       <div class="settings-card-title">Note evento</div>
-      <div class="settings-tabs">
-        <button class="settings-tab active" onclick="switchNoteTab('general', this)">
-          Note generali
-        </button>
-        <button class="settings-tab" onclick="switchNoteTab('coordinator', this)">
-          Note coordinatori
-        </button>
-      </div>
-
-      <div id="note-tab-general">
-        <div class="settings-row-desc" style="margin-bottom:8px;">
-          Visibili a tutti i moduli sul campo. Supporta grassetto, corsivo, link e liste.
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--text-secondary);
+            margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">
+            Note generali
+          </div>
+          <div style="font-size:13px;color:var(--text-primary);margin-bottom:6px;">
+            Visibili a tutti i moduli
+          </div>
+          ${buildRichEditor('editor-general', event.notes_general || '')}
+          <button class="btn-primary" style="margin-top:8px;width:100%;padding:6px 16px;"
+            onclick="saveNotes('general')">Salva note generali</button>
         </div>
-        ${buildRichEditor('editor-general', event.notes_general || '')}
-        <button class="btn-primary" style="margin-top:8px;width:auto;padding:6px 16px;"
-          onclick="saveNotes('general')">Salva note generali</button>
-      </div>
-
-      <div id="note-tab-coordinator" style="display:none;">
-        <div class="settings-row-desc" style="margin-bottom:8px;">
-          Visibili solo ai coordinatori LDC e PCA.
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--text-secondary);
+            margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">
+            Note coordinatori
+          </div>
+          <div style="font-size:13px;color:var(--text-primary);margin-bottom:6px;">
+            Visibili solo a LDC e PCA
+          </div>
+          ${buildRichEditor('editor-coordinator', event.notes_coordinators || '')}
+          <button class="btn-primary" style="margin-top:8px;width:100%;padding:6px 16px;"
+            onclick="saveNotes('coordinator')">Salva note coordinatori</button>
         </div>
-        ${buildRichEditor('editor-coordinator', event.notes_coordinators || '')}
-        <button class="btn-primary" style="margin-top:8px;width:auto;padding:6px 16px;"
-          onclick="saveNotes('coordinator')">Salva note coordinatori</button>
       </div>
     </div>
 
-    <!-- ── GEOMETRIES ── -->
+    <!-- ── GEOMETRIE ── -->
     <div class="settings-card">
       <div class="settings-card-title">Geometrie</div>
-      <div class="settings-row-desc" style="margin-bottom:12px;">
-        Carica file GeoJSON. Ogni feature deve avere le proprietà indicate per ogni layer.
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        ${buildGeoUpload('route',   'Percorso gara',    'MultiLineString', 'event_route',     'name',  'Carica il percorso di gara in formato geojson')}
+        ${buildGeoUpload('grid',    'Griglia',            'MultiPolygon',    'grid',            'label', 'Carica la griglia geografica di settori in formato geojson (tipo MultiPolygons). Inserire colonna "label" con il nome di ogni settore')}
       </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        ${buildGeoUpload('markers', 'Marker percorso',    'Point',           'markers_route',   'label', 'Carica i marker chilometrici della gara in formato geojson. Inserire colonna "km" per il chilometraggio (numero intero).')}
+        ${buildGeoUpload('fixed',   'Risorse fisse',      'Point',           'fixed_resources', 'label', 'Carica le risorse sanitarie fisse (PMA etc) in formato geojson. Inserire colonna "label" con il nome della risorsa')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr;gap:12px;">
+        ${buildGeoUpload('poi',     'Punti di interesse', 'Point',           'event_poi',       'name',  'Carica i punti di interesse dell\'evento in formato geojson. Inserire colonna "label" con il nome del punto di interesse.')}
+      </div>
+    </div>
 
-      ${buildGeoUpload('route',     'Percorso evento',    'MultiLineString',    'event_route',     'name',  'Proprietà richiesta: <code>name</code>')}
-      ${buildGeoUpload('markers',   'Marker percorso',    'Point',         'markers_route',   'label', 'Proprietà richieste: <code>km</code> (numero), <code>label</code> (opzionale)')}
-      ${buildGeoUpload('fixed',     'Risorse fisse',      'Point',         'fixed_resources', 'label', 'Proprietà richiesta: <code>label</code>')}
-      ${buildGeoUpload('grid',      'Griglia',            'MultiPolygon',  'grid',            'label', 'Proprietà richiesta: <code>label</code>')}
-      ${buildGeoUpload('poi',       'Punti di interesse', 'Point',         'event_poi',       'name',  'Proprietà richieste: <code>name</code>, <code>poi_type</code> (opzionale)')}
-    </div>`;
+    <!-- ── CHIUDI SESSIONE ── -->
+    <div style="display:flex;gap:12px;">
+      <button onclick="handleCloseAllSessions()" style="
+        flex:1;padding:8px 16px;border-radius:var(--radius);
+        border:1.5px solid var(--red);background:transparent;
+        color:var(--red);font-size:13px;font-weight:700;
+        font-family:var(--font);cursor:pointer;">
+        Chiudi sessioni moduli
+      </button>
+      <button onclick="handleNewSession()" style="
+        flex:1;padding:8px 16px;border-radius:var(--radius);
+        border:1.5px solid var(--orange);background:transparent;
+        color:var(--orange);font-size:13px;font-weight:700;
+        font-family:var(--font);cursor:pointer;">
+        Nuova giornata → <span id="session-label">(${nextLabel})</span>
+      </button>
+    </div>
 
-  // Init editors with content
+  </div>`;
+
   initEditor('editor-general',     event.notes_general     || '');
   initEditor('editor-coordinator', event.notes_coordinators || '');
 }
@@ -125,14 +185,33 @@ async function renderSettings() {
 async function saveEventToggle(field, value) {
   const ok = await updateEventFields(PCA.eventId, { [field]: value });
   if (!ok) { showToast('Errore salvataggio', 'error'); return; }
-  showToast(`${field === 'is_route' ? 'Modalità gara' : 'Griglia'} ${value ? 'attivata' : 'disattivata'} ✓`, 'success');
+  const labels = {
+    is_route: value ? 'Modalità gara attivata ✓' : 'Modalità gara disattivata',
+    is_grid:  value ? 'Griglia attivata ✓'        : 'Griglia disattivata',
+    is_active: value ? 'Evento attivato ✓'         : 'Evento disattivato',
+  };
+  showToast(labels[field] || 'Salvato ✓', 'success');
 }
 
-function switchNoteTab(tab, btn) {
-  document.getElementById('note-tab-general').style.display     = tab === 'general'     ? '' : 'none';
-  document.getElementById('note-tab-coordinator').style.display = tab === 'coordinator' ? '' : 'none';
-  document.querySelectorAll('.settings-tab').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+async function saveEventNameDesc() {
+  const name = document.getElementById('ev-name')?.value.trim();
+  const desc = document.getElementById('ev-description')?.value.trim() || null;
+  if (!name) { showToast('Il nome evento è obbligatorio', 'error'); return; }
+
+  const ok = await updateEventNameDesc(PCA.eventId, name, desc);
+  if (!ok) { showToast('Errore salvataggio', 'error'); return; }
+
+  // Update header
+  document.getElementById('header-event-name').textContent = name.toUpperCase();
+  PCA.event.name = name;
+  showToast('Evento aggiornato ✓', 'success');
+}
+
+async function handleCloseAllSessions() {
+  if (!confirm('Disconnettere tutti i moduli in campo?')) return;
+  const ok = await closeAllMobileSessions();
+  if (!ok) { showToast('Errore chiusura sessioni', 'error'); return; }
+  showToast('Sessioni chiuse ✓', 'success');
 }
 
 async function saveNotes(tab) {
@@ -144,6 +223,27 @@ async function saveNotes(tab) {
   if (!ok) { showToast('Errore salvataggio note', 'error'); return; }
 
   showToast('Note salvate ✓', 'success');
+}
+
+async function handleNewSession() {
+  const currentSession = PCA.event?.current_session || 1;
+  const nextSession = currentSession + 1;
+  const nextLabel = sessionLabel(nextSession);
+
+  if (!confirm(`Avviare giornata ${nextLabel}?\n\nQuesto disconnetterà tutti i moduli e azzererà le posizioni.`)) return;
+
+  const newSession = await incrementSession(PCA.eventId);
+  if (!newSession) { showToast('Errore avvio nuova sessione', 'error'); return; }
+
+  await wipeResourcePositions(PCA.eventId);
+  await closeAllMobileSessions();
+
+  // Update local state
+  PCA.event.current_session = newSession;
+
+  showToast(`Sessione ${newSession} avviata ✓`, 'success');
+  await renderSettings();
+
 }
 
 /* ================================================================

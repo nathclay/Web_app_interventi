@@ -834,6 +834,7 @@ async function submitIncident() {
                             })(),
       p_gcs_total:          null,
       p_hgt:                null,
+      p_session: STATE.event?.current_session || 1,
     };
 
 
@@ -1827,7 +1828,13 @@ async function savePatient(incidentId) {
 ================================================================ */
 function initIncidentForm() {
   document.getElementById('btn-open-incident-form')
-    .addEventListener('click', openIncidentForm);
+    .addEventListener('click', () => {
+      if (!STATE.event?.is_active) {
+        showToast('Evento non attivo — interventi disabilitati', 'error');
+        return;
+      }
+      openIncidentForm();
+    });
   document.getElementById('modal-incident-close')
     .addEventListener('click', () => closeModal('modal-incident'));
   document.getElementById('modal-detail-close')

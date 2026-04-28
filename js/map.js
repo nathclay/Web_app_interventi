@@ -119,8 +119,17 @@ async function refreshMapMarkers() {
     const lastSeen = ownPos.updated_at
       ? new Date(ownPos.updated_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
       : '—';
+
+    let zoneLabel = '';
+    if (STATE.event?.is_grid) {
+      const label = await getZoneLabel(lat, lng);
+      zoneLabel = ` · ${label}`;
+    }
+
     const popup = `<strong>${STATE.resource.resource}</strong><br>
-      <span style="font-size:11px;color:#8b949e;">Ultima pos: ${lastSeen}</span>`;
+      <span style="font-size:11px;color:#8b949e;">Ultima pos: ${lastSeen}<br>Settore: ${zoneLabel}</span>`;
+
+
 
     if (mapMarkers['own']) {
       mapMarkers['own'].setLatLng([lat, lng]);
@@ -141,17 +150,24 @@ async function refreshMapMarkers() {
 
   const resources = await fetchSectorResources();
 
-  resources.forEach(r => {
+  for (const r of resources) {
     const rcs  = r.resources_current_status;
-    if (!rcs?.geom) return;
+    if (!rcs?.geom) continue;
 
     const [lng, lat] = rcs.geom.coordinates;
     const status  = rcs.status || 'free';
     const lastSeen = rcs.location_updated_at
       ? new Date(rcs.location_updated_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
       : '—';
+    let zoneLabel = '';
+    if (STATE.event?.is_grid) {
+      const label = await getZoneLabel(lat, lng);
+      zoneLabel = ` · ${label}`;
+    }
+
     const popup = `<strong>${r.resource}</strong><br>
-      <span style="font-size:11px;color:#8b949e;">${r.resource_type} · Ultima pos: ${lastSeen}</span>`;
+      <span style="font-size:11px;color:#8b949e;">Ultima pos: ${lastSeen}<br>Settore: ${zoneLabel}</span>`;
+
 
     if (mapMarkers[r.id]) {
       mapMarkers[r.id].setLatLng([lat, lng]);
@@ -162,7 +178,7 @@ async function refreshMapMarkers() {
         .addTo(mapInstance)
         .bindPopup(popup);
     }
-  });
+  }
 }
 
 async function refreshEnRouteMarker() {
@@ -259,6 +275,15 @@ async function updateMapZone(lat, lng) {
   }
 }
 
+async function getZoneLabel(lat, lng) {
+  const { data } = await db.rpc('get_zone_for_point', {
+    p_event_id: STATE.resource.event_id,
+    p_lng:      lng,
+    p_lat:      lat,
+  });
+  return (data?.length) ? data[0].grid_label : 'nd';
+}
+
 async function updateMapKm(lat, lng) {
   if (!STATE.event?.is_route) return;
 
@@ -300,6 +325,10 @@ async function refreshMapInfoBar() {
   if (sendBtn && !sendBtn.dataset.wired) {
     sendBtn.dataset.wired = '1';
     sendBtn.addEventListener('click', async () => {
+      if (!STATE.event?.is_active) {
+        showToast('Evento non attivo — invio posizione disabilitato', 'error');
+        return;
+      }
       sendBtn.textContent = '📍 Localizzazione...';
       sendBtn.disabled = true;
       try {

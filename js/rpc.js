@@ -47,6 +47,7 @@ async function fetchIncidents() {
         )
       `)
       .in('id', incidentIds)
+      .eq('session', STATE.event.current_session)
       .order('updated_at', { ascending: false });
 
 
@@ -89,6 +90,7 @@ async function fetchIncidents() {
         )
       `)
       .in('id', allIds)
+      .eq('session', STATE.event.current_session)
       .order('updated_at', { ascending: false });
 
     return (incidents || []).map(i => ({
@@ -223,7 +225,7 @@ async function fetchResourcePosition() {
     .from('resources_current_status')
     .select('geom, location_updated_at')
     .eq('resource_id', STATE.resource.id)
-    .single();
+    .maybeSingle();
 
   if (rcs?.geom) return { geom: rcs.geom, updated_at: rcs.location_updated_at, type: 'live' };
 

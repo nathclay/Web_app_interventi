@@ -96,8 +96,8 @@ async function restoreResourceFromSession(email) {
   const { data: event } = await db
     .from('events')
     .select('*')
-    .eq('is_active', true)
-    .single();
+    .eq('id', resource.event_id)
+    .maybeSingle();
 
   STATE.event = event;
 
@@ -150,8 +150,8 @@ async function handleLogin(e) {
     const { data: event } = await db
       .from('events')
       .select('*')
-      .eq('is_active', true)
-      .single();
+      .eq('id', resource.event_id)
+      .maybeSingle();
 
     STATE.event = event;
 
@@ -178,6 +178,11 @@ async function loadPersonnelScreen() {
     // .eq('present', true)  TODO: add when present tracking is live
     .order('name');
 
+  if (!personnel || personnel.length === 0) {
+    launchView();  
+    return;
+  }  
+  
   const list = document.getElementById('personnel-list');
   list.innerHTML = '';
 

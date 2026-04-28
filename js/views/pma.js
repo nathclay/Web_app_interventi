@@ -80,7 +80,7 @@ async function fetchPMAIncoming() {
       id, outcome, dest_pma_id, assigned_at,
       incidents(
         id, patient_name, patient_identifier, patient_age, patient_gender,
-        current_triage, description,
+        current_triage, description, session,
         patient_assessments(
           id, assessed_at, conscious, respiration, circulation,
           walking, minor_injuries, heart_rate, spo2, breathing_rate,
@@ -94,7 +94,8 @@ async function fetchPMAIncoming() {
     .eq('dest_pma_id', STATE.resource.id);
 
   if (error) { console.error('fetchPMAIncoming:', error); return []; }
-  return data || [];
+  const session = STATE.event?.current_session || 1;
+  return (data || []).filter(r => r.incidents?.session === session);
 }
 
 async function fetchPMAActive() {
@@ -105,7 +106,7 @@ async function fetchPMAActive() {
       id, outcome, assigned_at,
       incidents(
         id, patient_name, patient_identifier, patient_age, patient_gender,
-        current_triage, description,
+        current_triage, description, session,
         patient_assessments(
           id, assessed_at, conscious, respiration, circulation,
           walking, minor_injuries, heart_rate, spo2, breathing_rate,
@@ -118,7 +119,8 @@ async function fetchPMAActive() {
     .eq('outcome', 'treating');
 
   if (error) { console.error('fetchPMAActive:', error); return []; }
-  return data || [];
+  const session = STATE.event?.current_session || 1;
+  return (data || []).filter(r => r.incidents?.session === session);
 }
 
 async function fetchPMAClosed() {
@@ -129,7 +131,7 @@ async function fetchPMAClosed() {
       id, outcome, released_at, dest_hospital, handoff_to_response_id,
       incidents(
         id, patient_name, patient_identifier, patient_age, patient_gender,
-        current_triage,
+        current_triage, session,
         patient_assessments(
           id, assessed_at, conscious, respiration, circulation,
           walking, minor_injuries, heart_rate, spo2, breathing_rate,
@@ -143,7 +145,8 @@ async function fetchPMAClosed() {
     .order('released_at', { ascending: false });
 
   if (error) { console.error('fetchPMAClosed:', error); return []; }
-  return data || [];
+  const session = STATE.event?.current_session || 1;
+  return (data || []).filter(r => r.incidents?.session === session);
 }
 
 /* ----------------------------------------------------------------
@@ -1442,6 +1445,8 @@ async function selectNPIngresso(btn, type) {
 }
 
 async function submitNewPatient() {
+  console.log('STATE.personnel:', STATE.personnel);
+console.log('personnel id:', STATE.personnel?.id);
   const btn = document.getElementById('btn-submit-new-patient');
 
   if (PMA_FORM.conscious === null)   { showToast('Indica coscienza', 'error'); return; }
@@ -1479,6 +1484,12 @@ async function submitNewPatient() {
       p_temperature:     parseFloat(document.getElementById('np-temperature')?.value)  || null,
       p_triage:          PMA_FORM.triage,
       p_clinical_notes:  document.getElementById('np-clinical-notes')?.value.trim()   || null,
+      p_session: STATE.event?.current_session || 1,
+      p_reporting_resource_id: null,
+      p_location_description:  null,
+      p_gcs_total:             parseInt(document.getElementById('np-gcs')?.value) || null,
+      p_hgt:                   document.getElementById('np-hgt')?.value || null,
+      p_iv_access:             PMA_FORM.iv_access,
     };
 
     const { data, error } = await db.rpc('create_incident_with_assessment', params);

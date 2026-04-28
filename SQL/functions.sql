@@ -28,7 +28,8 @@ CREATE OR REPLACE FUNCTION create_incident_with_assessment(
   p_iv_access             BOOLEAN,
   p_triage                triage_enum,
   p_description           TEXT,
-  p_clinical_notes        TEXT
+  p_clinical_notes        TEXT,
+  p_session               integer DEFAULT 1
 )
 RETURNS JSON AS $$
 DECLARE
@@ -49,12 +50,12 @@ BEGIN
   INSERT INTO incidents (
     event_id, incident_type, geom,
     patient_name, patient_age, patient_gender, patient_identifier,
-    description, location_description, reported_by_resource_id, initial_outcome
+    description, location_description, reported_by_resource_id, initial_outcome, session
   )
   VALUES (
     p_event_id, p_incident_type, v_geom,
     p_patient_name, p_patient_age, p_patient_gender, p_patient_identifier,
-    p_description, p_location_description, p_resource_id, p_initial_outcome
+    p_description, p_location_description, p_resource_id, p_initial_outcome, p_session
   )
   RETURNING id INTO v_incident_id;
 
@@ -767,6 +768,22 @@ AS $$
   LIMIT 1;
 $$;
 
+CREATE OR REPLACE FUNCTION close_all_mobile_sessions()
+RETURNS void
+LANGUAGE sql
+SECURITY DEFINER
+AS $$
+  DELETE FROM auth.sessions
+  WHERE user_id IN (
+    SELECT au.id
+    FROM auth.users au
+    JOIN public.resources r ON r.user_email = au.email
+    WHERE r.event_id = (SELECT id FROM events WHERE is_active = true LIMIT 1)
+      AND r.resource_type NOT IN ('PCA')
+  );
+$$;
+
+
 
 
 -- ================================================================
@@ -781,4 +798,5 @@ GRANT EXECUTE ON FUNCTION get_nearest_poi               TO authenticated;
 GRANT EXECUTE ON FUNCTION get_resource_trail            TO authenticated;
 GRANT EXECUTE ON FUNCTION get_zone_for_point            TO authenticated;
 GRANT EXECUTE ON FUNCTION get_nearest_route_marker      TO authenticated;
+GRANT EXECUTE ON FUNCTION close_all_mobile_sessions     TO authenticated;
 

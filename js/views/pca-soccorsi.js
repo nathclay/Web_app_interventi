@@ -98,6 +98,16 @@ async function mountSoccorsi(container) {
   await renderSoccorsiTables();
 }
 
+// Session date labels — session 1 = start_date, session 2 = start_date + 1 day, etc.
+function sessionLabel(sessionNum) {
+  const startTime = PCA.event?.start_time;
+  if (!startTime) return `Sessione ${sessionNum}`;
+  const date = new Date(startTime);
+  date.setDate(date.getDate() + (sessionNum - 1));
+  return date.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'long' });
+}
+
+
 /* ================================================================
    DATA & RENDER
    renderSoccorsiTables — fetches all incidents with assessments,
@@ -108,25 +118,36 @@ async function mountSoccorsi(container) {
    buildCRCDots         — renders conscious/respiration/circulation
                           as coloured dot indicators.
 ================================================================ */
-async function renderSoccorsiTables() {
+let _soccorsiSession = null;
+
+async function renderSoccorsiTables(filterSession = null) {
   const body = document.getElementById('soccorsi-body');
   if (!body) return;
 
-  const incidents = await fetchSoccorsiIncidents(PCA.eventId);
+  const session = filterSession ?? PCA.event?.current_session ?? 1;
+
+  const maxSession = PCA.event?.current_session || 1;
+
+  const incidents = await fetchSoccorsiIncidents(
+    PCA.eventId,
+    _soccorsiSession === -1 ? null : session
+  );
 
   const updatedEl = document.getElementById('soccorsi-updated');
   if (updatedEl) updatedEl.textContent = `Aggiornato alle ${formatTime(new Date().toISOString())}`;
 
   // Filter out pure PMA walk-ins (all responses are PMA type)
   const visible = incidents.filter(i => !isPMAOnly(i));
-
   const active = visible.filter(i => ['open', 'in_progress'].includes(i.status));
   const closed = visible.filter(i => ['resolved', 'taken_to_hospital', 'in_progress_in_pma'].includes(i.status));
+
   body.innerHTML = `
+     ${buildSessionBar(session, 'renderSoccorsiTables')}
     ${buildSoccorsiSection('Soccorsi attivi', active, true)}
     ${buildSoccorsiSection('Soccorsi chiusi', closed, false)}
   `;
 }
+
 
 function buildSoccorsiSection(title, incidents, isActive) {
   const badge = isActive

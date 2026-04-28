@@ -113,10 +113,10 @@
           <div class="section-label">Evento in corso</div>
           <div class="event-name" id="event-name">—</div>
           <div class="event-time-row">
-            <div class="event-time-box">
+            <!--<div class="event-time-box">
               <div class="time-box-label">Inizio gara</div>
               <div class="time-box-value" id="event-start">--:--</div>
-            </div>
+            </div>--> 
             <div class="event-time-box">
               <div class="time-box-label">Ora attuale</div>
               <div class="time-box-value" id="clock-now">--:--</div>
@@ -499,6 +499,13 @@ window.addEventListener('load', function() {
   });
   initAuth();
   boot();
+  // Force session check when app comes back to foreground 
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible') {
+      const { error } = await db.auth.refreshSession();
+      if (error) await logout();
+    }
+  });
 });
 </script>
 

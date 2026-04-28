@@ -32,13 +32,20 @@ async function mountOspedalizzazioni(container) {
                             completed sections.
    buildHospitalTable     — builds the HTML table for a set of rows.
 ================================================================ */
-async function renderOspedalizzazioni() {
+let _hospitalSession = null;
+
+async function renderOspedalizzazioni(filterSession) {
+  if (filterSession !== undefined) _hospitalSession = filterSession;
   const body = document.getElementById('hospital-body');
   if (!body) return;
 
-  // Fetch all hospital responses
-  const responses = await fetchHospitalResponses(PCA.eventId);
+  const session = _hospitalSession ?? PCA.event?.current_session ?? 1;
 
+  // Fetch all hospital responses
+  const responses = await fetchHospitalResponses(
+    PCA.eventId,
+    _hospitalSession === -1 ? null : session
+  );
 
   // Fetch latest assessment per incident
   const incidentIds = [...new Set(responses.map(r => r.incident_id).filter(Boolean))];
@@ -54,6 +61,7 @@ async function renderOspedalizzazioni() {
   const completed  = rows.filter(r => r.outcome === 'taken_to_hospital');
 
   body.innerHTML = `
+    ${buildSessionBar(session, 'renderOspedalizzazioni')}
     <div class="hospital-section">
       <div class="hospital-section-header">
         <span class="hospital-section-title">In trasporto</span>

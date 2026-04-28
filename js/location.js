@@ -35,6 +35,7 @@ async function onPosition(pos) {
   const now = Date.now();
   if (now - lastLocationSent < LOCATION_THROTTLE_MS) return;
   if (!STATE.isOnline) return; 
+  if (!STATE.event?.is_active) return;
   lastLocationSent = now;
 
   await insertLocation(pos.coords);

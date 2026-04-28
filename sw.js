@@ -3,7 +3,7 @@
    Handles: cache-first serving, offline incident queue
 ============================================================ */
 
-const CACHE_NAME = 'cge-mobile-v2';
+const CACHE_NAME = 'cge-mobile-v3';
 
 // Core files to cache on install
 // Supabase API calls are NOT cached — always go to network

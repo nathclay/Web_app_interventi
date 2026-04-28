@@ -56,6 +56,13 @@ async function loadMobileView() {
   // Event panel
   populateEventPanel();
 
+  const incBtn = document.getElementById('btn-open-incident-form');
+  if (incBtn && !STATE.event?.is_active) {
+    incBtn.style.opacity = '0.4';
+    incBtn.style.pointerEvents = 'none';
+    incBtn.title = 'Evento non attivo';
+  }
+
   // Start live clock
   startClock();
 
@@ -205,10 +212,17 @@ function populateEventPanel() {
   const ev = STATE.event;
   const r  = STATE.resource;
 
-  document.getElementById('event-name').textContent =
-    ev ? ev.name : '—';
+  // Section label — changes based on active state
+  const sectionLabel = document.querySelector('#panel-evento .section-label');
+  if (sectionLabel) {
+    sectionLabel.textContent = ev?.is_active ? 'Evento in corso' : 'Evento non attivo';
+    sectionLabel.style.color = ev?.is_active ? '' : 'var(--text-secondary)';
+  }
 
-  document.getElementById('event-start').textContent =
+  document.getElementById('event-name').textContent = ev?.name || '—';
+
+  const eventStartEl = document.getElementById('event-start');
+  if (eventStartEl) eventStartEl.textContent =
     ev?.start_time
       ? new Date(ev.start_time).toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' })
       : '--:--';
@@ -220,26 +234,25 @@ function populateEventPanel() {
     document.getElementById('radio-channel-desc').textContent =
       r.event_radio_channels.description  || '';
   }
+
   const isCoord = r.resource_type === 'LDC';
   const eventNotes = isCoord
     ? [ev?.notes_general, ev?.notes_coordinators].filter(Boolean).join('<hr style="border-color:var(--border-color);margin:8px 0;">')
     : (ev?.notes_general || '');
 
-  const eventNotesBlock = document.getElementById('event-notes-block');
+  const eventNotesBlock   = document.getElementById('event-notes-block');
   const eventNotesContent = document.getElementById('event-notes-content');
   if (eventNotes && eventNotesContent) {
     eventNotesContent.innerHTML = eventNotes;
     eventNotesBlock.style.display = '';
   }
 
-  // Note operative — resource-level notes
-  const resourceNotesBlock = document.getElementById('resource-notes-block');
+  const resourceNotesBlock   = document.getElementById('resource-notes-block');
   const resourceNotesContent = document.getElementById('resource-notes-content');
   if (r.notes && resourceNotesContent) {
     resourceNotesContent.textContent = r.notes;
     resourceNotesBlock.style.display = '';
   }
-
 }
 
 /* Filter teams (coordinator only) */
