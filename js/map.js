@@ -53,17 +53,17 @@ function invalidateMiniMap() {
    ICONS
 ---------------------------------------------------------------- */
 function ownResourceIcon() {
-  const r = STATE.resource;
-  const label = (r.resource || r.resource_type || '?').substring(0, 8);
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="38" height="48" viewBox="0 0 38 48">
-      <rect x="1" y="1" width="36" height="30" rx="6" fill="#1e7fff" stroke="#ffffff" stroke-width="2.5"/>
-      <text x="19" y="20" text-anchor="middle" dominant-baseline="middle"
-        font-family="system-ui,sans-serif" font-size="9" font-weight="700" fill="#ffffff">${label}</text>
-      <polygon points="14,31 24,31 19,40" fill="#1e7fff" stroke="#ffffff" stroke-width="1.5"/>
-      <circle cx="19" cy="44" r="3" fill="#ffffff" opacity="0.9"/>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8" fill="#1e7fff" fill-opacity="0.2"/>
+      <circle cx="12" cy="12" r="5" fill="#1e7fff" stroke="#fff" stroke-width="2"/>
     </svg>`;
-  return L.divIcon({ html: svg, className: '', iconSize: [38, 48], iconAnchor: [19, 44], popupAnchor: [0, -48] });
+  return L.divIcon({
+    html: svg, className: '',
+    iconSize:   [24, 24],
+    iconAnchor: [12, 12],
+    popupAnchor:[0, -14],
+  });
 }
 
 function resourceIcon(resource, status) {
@@ -149,23 +149,6 @@ async function initMap() {
   });
   new SendPositionControl({ position: 'bottomleft' }).addTo(mapInstance);
 
-  const CercaControl = L.Control.extend({
-    onAdd: function() {
-      const div = L.DomUtil.create('div');
-      div.innerHTML = `
-        <button id="btn-map-cerca" style="
-          padding:9px 14px;border-radius:var(--radius);
-          border:1.5px solid var(--blue);background:white;
-          color:#1060cc;font-size:12px;font-weight:700;
-          font-family:var(--font);cursor:pointer;
-          box-shadow:0 1px 5px rgba(0,0,0,0.3);">
-          🔍 Cerca
-        </button>`;
-      L.DomEvent.disableClickPropagation(div);
-      return div;
-    }
-  });
-  new CercaControl({ position: 'bottomright' }).addTo(mapInstance);
 
     await loadEventGeoLayers();
     await refreshMapMarkers();
@@ -483,7 +466,13 @@ async function loadEventGeoLayers() {
       }).bindPopup(`<strong>${row.label || '—'}</strong>`)
         .addTo(gridLayerGroup);
     });
-    if (data?.length) addGridAxisLabels(data, mapInstance);
+    if (data?.length) {
+      addGridAxisLabels(data, mapInstance);  // builds gridLabelsLayer first
+      gridLayerGroup.addTo(mapInstance);
+      gridLabelsLayer.addTo(mapInstance);
+      const btn = document.getElementById('btn-toggle-grid');
+      if (btn) { btn.style.background = 'var(--blue-dim)'; btn.style.color = '#1060cc'; }
+    }
   }
 
   const { data: pois } = await db
@@ -694,17 +683,17 @@ async function initCercaPanel() {
           </optgroup>`
         ).join('');
 
-      poiSelect.addEventListener('change', () => {
-        const poi = pois.find(p => p.id === poiSelect.value);
-        if (!poi?.geom?.coordinates) return;
-        clearCercaLayers();
-        const [lng, lat] = poi.geom.coordinates;
-        _cercaPoiMarker = L.marker([lat, lng])
-          .addTo(mapInstance)
-          .bindPopup(`<strong>${poi.label}</strong>`)
-          .openPopup();
-        mapInstance.setView([lat, lng], 17);
-      });
+    poiSelect.addEventListener('change', () => {
+      const poi = pois.find(p => p.id === poiSelect.value);
+      if (!poi?.geom?.coordinates) return;
+      clearCercaLayers();
+      const [lng, lat] = poi.geom.coordinates;
+      _cercaPoiMarker = L.marker([lat, lng], { icon: poiIcon(poi.poi_type) })  // ← add icon
+        .addTo(mapInstance)
+        .bindPopup(`<strong>${poi.label}</strong>${poi.poi_type ? `<br><span style="font-size:11px;color:#888">${poi.poi_type}</span>` : ''}`)
+        .openPopup();
+      mapInstance.setView([lat, lng], 17);
+    });
     }
 
   

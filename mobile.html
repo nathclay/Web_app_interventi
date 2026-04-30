@@ -246,11 +246,17 @@
             </div>
           </div>
           <!-- Row 3: sector (is_grid only) -->
-          <div id="map-sector-row" style="display:none;
-            align-items:center;justify-content:space-between;gap:8px;">
-            <div style="font-size:14px;font-weight:600;color:var(--text-secondary);">
-              🗂 Ti trovi nel settore: <span id="map-sector-value"
-                style="color:var(--text-primary);font-size:15px;">—</span>
+          <div id="map-sector-row" style="display:none;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:13px;font-weight:600;color:var(--text-secondary);white-space:nowrap;">Settore: 🗂</span>
+              <span id="map-sector-value" style="font-size:14px;font-weight:700;color:var(--text-primary);white-space:nowrap;">—</span>
+              <button id="btn-map-cerca" style="
+                margin-left:auto;padding:5px 10px;border-radius:var(--radius);
+                border:1.5px solid var(--blue);background:var(--blue-dim);
+                color:#1060cc;font-size:12px;font-weight:700;
+                font-family:var(--font);cursor:pointer;white-space:nowrap;">
+                🔍 Cerca
+              </button>
             </div>
           </div>
           <!-- Row 4: km (is_route only) -->
