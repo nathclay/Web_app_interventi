@@ -148,7 +148,7 @@ async function renderSettings() {
         ${buildGeoUpload('fixed',   'Risorse fisse',      'Point',           'fixed_resources', 'label', 'Carica le risorse sanitarie fisse (PMA etc) in formato geojson. Inserire colonna "label" con il nome della risorsa')}
       </div>
       <div style="display:grid;grid-template-columns:1fr;gap:12px;">
-        ${buildGeoUpload('poi',     'Punti di interesse', 'Point',           'event_poi',       'name',  'Carica i punti di interesse dell\'evento in formato geojson. Inserire colonna "label" con il nome del punto di interesse.')}
+        ${buildGeoUpload('poi',     'Punti di interesse', 'Point',           'event_poi',       'label',  'Carica i punti di interesse dell\'evento in formato geojson. Inserire colonna "label" con il nome del punto di interesse.')}
       </div>
     </div>
 

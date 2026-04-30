@@ -275,6 +275,22 @@
               style="color:var(--text-primary);">—</span>
           </div>
 
+          <div style="display:flex;gap:8px;">
+            <button id="btn-toggle-grid" onclick="toggleGridLayer()" style="
+              flex:1;padding:7px 12px;border-radius:var(--radius);
+              border:1.5px solid var(--blue);background:var(--blue-dim);
+              color:#1060cc;font-size:12px;font-weight:700;
+              font-family:var(--font);cursor:pointer;text-align:center;">
+              🗂 Griglia
+            </button>
+            <button id="btn-toggle-poi" onclick="togglePoiLayer()" style="
+              flex:1;padding:7px 12px;border-radius:var(--radius);
+              border:1.5px solid var(--border-bright);background:var(--bg-card);
+              color:var(--text-primary);font-size:12px;font-weight:700;
+              font-family:var(--font);cursor:pointer;text-align:center;">
+              📍 Punti di Interesse
+            </button>
+          </div>
           <!-- Row 5: cerca expanded panel (hidden by default) -->
           <div id="map-cerca-panel" style="display:none;flex-direction:column;gap:8px;">
               <div style="display:flex;gap:8px;">

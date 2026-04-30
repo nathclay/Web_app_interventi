@@ -917,3 +917,107 @@ input[type="time"] { font-family: var(--font-mono); }
   font-weight: 700;
   color: var(--yellow);
 }
+
+/* ================================================================
+   Add these rules to dispositivo.css
+   Attivazioni view — new header layout + table styles
+================================================================ */
+
+/* ── Attivazioni view header ───────────────────────────────────*/
+.att-view-header {
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.att-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Mode buttons (Tutte / Data specifica / Fino a / Range) */
+.att-mode-btns { display: flex; gap: 4px; }
+.att-mode-btn {
+  background: var(--bg-3); border: 2px solid var(--border);
+  border-radius: var(--radius); color: var(--text-secondary);
+  cursor: pointer; font-size: 13px; font-weight: 700;
+  padding: 5px 14px; transition: all 0.15s; font-family: var(--font-body);
+}
+.att-mode-btn:hover  { border-color: var(--border-bright); color: var(--text-primary); }
+.att-mode-btn.active { background: var(--blue-dim); border-color: var(--blue); color: var(--blue); }
+
+/* Date picker inputs row */
+.att-date-inputs {
+  display: flex; align-items: center; gap: 8px;
+}
+.att-date-label {
+  font-size: 12px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.session-select-sm {
+  background: var(--bg-2); border: 2px solid var(--border);
+  border-radius: var(--radius); color: var(--text-primary);
+  font-family: var(--font-body); font-size: 13px; font-weight: 600;
+  padding: 5px 10px; cursor: pointer; min-width: 200px;
+}
+.session-select-sm:focus { outline: none; border-color: var(--blue); }
+
+/* Toggle buttons (Non attivati / Non comunicati) */
+.att-toggle-btns { display: flex; gap: 6px; }
+.att-toggle-btn {
+  background: var(--bg-3); border: 2px solid var(--border);
+  border-radius: var(--radius); color: var(--text-secondary);
+  cursor: pointer; font-size: 13px; font-weight: 700;
+  padding: 5px 14px; transition: all 0.15s; font-family: var(--font-body);
+}
+.att-toggle-btn:hover  { border-color: var(--border-bright); color: var(--text-primary); }
+.att-toggle-btn.active { background: var(--yellow-dim); border-color: var(--yellow); color: var(--yellow); }
+
+/* ── Attivazioni table ─────────────────────────────────────────*/
+.att-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.att-table th {
+  padding: 10px 12px; text-align: left;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.07em; color: var(--text-muted);
+  background: var(--bg-3); border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+.att-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+.att-table tbody tr:hover { background: #f8f9fc; }
+.att-table tbody tr:last-child { border-bottom: none; }
+.att-table td { padding: 10px 12px; vertical-align: middle; }
+
+/* Reddish row for non-comunicato */
+.att-row-no-com { background: rgba(220, 38, 38, 0.05) !important; }
+.att-row-no-com:hover { background: rgba(220, 38, 38, 0.09) !important; }
+
+.att-name     { font-weight: 700; font-size: 14px; }
+.att-phone    { font-size: 13px; white-space: nowrap; }
+.att-comitato { font-size: 13px; color: var(--text-secondary); }
+.att-date     { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
+.att-time     { font-size: 13px; font-family: var(--font-mono); white-space: nowrap; }
+.att-role     { font-size: 13px; color: var(--text-secondary); }
+.att-resource { font-size: 13px; font-family: var(--font-mono); font-weight: 600; }
+.att-badge-cell { text-align: center; }
+
+/* Sì / No badges */
+.att-bool-badge {
+  display: inline-block;
+  font-size: 12px; font-weight: 700;
+  padding: 3px 10px; border-radius: 20px;
+  min-width: 36px; text-align: center;
+}
+.badge-yes { background: var(--green-dim); color: var(--green); border: 1px solid var(--green-border); }
+.badge-no  { background: var(--bg-4);       color: var(--text-muted); border: 1px solid var(--border); }
+
+/* Checkbox */
+.att-check { width: 15px; height: 15px; cursor: pointer; accent-color: var(--blue); }

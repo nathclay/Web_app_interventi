@@ -198,6 +198,24 @@ async function loadBaseData() {
 }
 
 /* ================================================================
+   DATA LOADING (shared between views)
+================================================================ */
+async function loadSessionData() {
+  const [resourceDays, personnel, requirements] = await Promise.all([
+    fetchResourceDaysForSession(DISP.eventId, DISP.session),
+    fetchPersonnelForSession(DISP.eventId, DISP.session),
+    fetchRequirements(),
+  ]);
+  DISP.resourceDays = resourceDays;
+  DISP.personnel    = personnel;
+  DISP.requirements = requirements;
+}
+ 
+async function reloadPersonnel() {
+  DISP.personnel = await fetchPersonnelForSession(DISP.eventId, DISP.session);
+}
+
+/* ================================================================
    ROUTER
 ================================================================ */
 async function navigateTo(page) {
@@ -208,9 +226,10 @@ async function navigateTo(page) {
   const content = document.getElementById('page-content');
   content.innerHTML = '<div class="loading-spinner"><div class="spinner"></div><span>Caricamento...</span></div>';
   try {
-    if      (page === 'ricerca')      await mountRicerca(content);
-    else if (page === 'attivazioni')  await mountAttivazioni(content);
-    else if (page === 'impostazioni') await mountImpostazioni(content);
+    if      (page === 'ricerca')        await mountRicerca(content);
+    else if (page === 'attivazioni')    await mountAttivazioni(content);
+    else if (page === 'coordinamento')  await mountCoordinamento(content);
+    else if (page === 'impostazioni')   await mountImpostazioni(content);
   } catch (err) {
     console.error(err);
     content.innerHTML = `<div class="empty-state">Errore: ${err.message}</div>`;
@@ -218,557 +237,8 @@ async function navigateTo(page) {
 }
 
 /* ================================================================
-   VIEW: RICERCA PERSONALE
+   TWO-STEP ASSIGNMENT MODAL
 ================================================================ */
-async function mountRicerca(container) {
-  container.innerHTML = `
-    <div class="view-header">
-      <div class="view-header-left">
-        <h2 class="view-title">Ricerca personale</h2>
-        <select id="ricerca-session" class="session-select"></select>
-      </div>
-    </div>
-    <div id="ricerca-grid" class="view-body"></div>`;
-
-  const sel = document.getElementById('ricerca-session');
-  sel.innerHTML = DISP.sessions.map(s =>
-    `<option value="${s.session}" ${s.session===DISP.session?'selected':''}>${s.label}</option>`
-  ).join('');
-  sel.addEventListener('change', async () => {
-    DISP.session = +sel.value; await loadSessionData(); renderRicercaGrid();
-  });
-
-  await loadSessionData();
-  renderRicercaGrid();
-}
-
-async function loadSessionData() {
-  const [resourceDays, personnel, requirements] = await Promise.all([
-    fetchResourceDaysForSession(DISP.eventId, DISP.session),
-    fetchPersonnelForSession(DISP.eventId, DISP.session),
-    fetchRequirements(),
-  ]);
-  DISP.resourceDays = resourceDays; DISP.personnel = personnel; DISP.requirements = requirements;
-}
-
-async function reloadPersonnel() {
-  DISP.personnel = await fetchPersonnelForSession(DISP.eventId, DISP.session);
-}
-
-function renderRicercaGrid() {
-  const container = document.getElementById('ricerca-grid');
-  if (!container) return;
- 
-  // Apply competenza filter and exclude cancelled
-  const visPersonnel = DISP.personnel
-    .filter(p => p.status !== 'cancelled')
-    .filter(p => !DISP.competenzaFilter ||
-      p.anagrafica?.competenza_attivazione === DISP.competenzaFilter);
- 
-  // Group by resource_day_id
-  const byRD = {};
-  visPersonnel.forEach(p => {
-    if (!byRD[p.resource_day_id]) byRD[p.resource_day_id] = [];
-    byRD[p.resource_day_id].push(p);
-  });
- 
-  // Group resource days by type
-  const byType = {};
-  DISP.resourceDays.forEach(rd => {
-    if (!byType[rd.resource_type]) byType[rd.resource_type] = [];
-    byType[rd.resource_type].push(rd);
-  });
- 
-  if (!DISP.resourceDays.length) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">📋</div>
-        Nessuna risorsa per questa sessione.
-        <button class="btn-primary" style="margin-top:12px"
-          onclick="openAddResourceDayModal()">+ Aggiungi risorsa</button>
-      </div>`;
-    return;
-  }
- 
-  // Build sections in defined order
-  const sections = [];
-  TYPE_ORDER.forEach(t => {
-    if (byType[t]?.length) sections.push(buildTypeSection(t, byType[t], byRD));
-  });
-  Object.keys(byType).forEach(t => {
-    if (!TYPE_ORDER.includes(t)) sections.push(buildTypeSection(t, byType[t], byRD));
-  });
- 
-  // Apply stored legend colors
-  applyStoredLegendColors();
- 
-  container.innerHTML = `
-    <div class="grid-legend" id="grid-legend">
-      <div class="legend-item">
-        <div class="legend-swatch" id="swatch-missing"
-          style="background:var(--cell-missing)"></div>
-        <span>Risorsa da trovare</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-swatch" id="swatch-complete"
-          style="background:var(--cell-complete)"></div>
-        <span>Modulo completo</span>
-      </div>
-      <button class="btn-legend-edit" onclick="openLegendEditor()">✎ Modifica colori</button>
-    </div>
-    ${buildRecapBar(DISP.resourceDays, byRD)}
-    ${sections.join('')}`;
-}
-
-const RECAP_ROLES = ['autista', 'infermiere', 'medico'];
-
-function buildRecapBar(resourceDays, byRD) {
-  // Map: role → turno_label → { needed, missing }
-  const recap = {};
-  RECAP_ROLES.forEach(r => recap[r] = {});
-
-  resourceDays.forEach(rd => {
-    const rdStart = rd.rd_start || rd.start_time;
-    const rdEnd   = rd.rd_end   || rd.end_time;
-    const turni   = computeTurni(rdStart, rdEnd);
-    const crew    = byRD[rd.resource_day_id] || [];
-
-    // Only process resource types that require these roles
-    const reqs = DISP.requirements[rd.resource_type] || [];
-    const requiredRoles = new Set(reqs.map(r => r.role));
-
-    RECAP_ROLES.forEach(role => {
-      if (!requiredRoles.has(role)) return;
-
-      const slots = turni
-        ? turni.slice(1) // skip "intero turno", use 1° and 2° only
-        : [{ start: fmtTimeParts(rdStart), end: fmtTimeParts(rdEnd),
-             label: `${fmtTimeParts(rdStart)}–${fmtTimeParts(rdEnd)}` }];
-
-      slots.forEach(slot => {
-        const label = `${slot.start}–${slot.end}`;
-        if (!recap[role][label]) recap[role][label] = { needed: 0, missing: 0 };
-        recap[role][label].needed++;
-
-        // Check if this slot is covered
-        const active = crew.filter(p =>
-          p.role === role && p.status !== 'cancelled' && p.status !== 'no_show'
-        );
-        const slotCovered = active.some(p => {
-          if (!p.scheduled_start || !p.scheduled_end) return true; // no time = treat as covering
-          const pS = toMinutes(parseTime(p.scheduled_start));
-          const pE = toMinutes(parseTime(p.scheduled_end));
-          const sS = toMinutes(slot.start);
-          const sE = toMinutes(slot.end);
-          return pS <= sS && pE >= sE;
-        });
-
-        if (!slotCovered) recap[role][label].missing++;
-      });
-    });
-  });
-
-  // Build HTML — only show roles with at least one missing
-  const roleBlocks = RECAP_ROLES.map(role => {
-    const slots = recap[role];
-    const slotEntries = Object.entries(slots).filter(([, v]) => v.missing > 0);
-    if (!slotEntries.length) return '';
-
-    const slotTags = slotEntries.map(([label, v]) =>
-      `<span class="recap-slot">
-        <span class="recap-slot-time">${label}</span>
-        <span class="recap-slot-count">mancano ${v.missing}</span>
-      </span>`
-    ).join('');
-
-    return `
-      <div class="recap-role-block">
-        <span class="recap-role-name">${ROLE_LABELS[role]}</span>
-        ${slotTags}
-      </div>`;
-  }).join('');
-
-  if (!roleBlocks) return '';
-
-  return `
-    <div class="recap-bar" id="recap-bar">
-      <span class="recap-title">Riepilogo carenze</span>
-      ${roleBlocks}
-    </div>`;
-}
-
-function openLegendEditor() {
-  const panel = document.getElementById('legend-editor');
-  if (panel) { panel.remove(); return; }
-
-  const stored = JSON.parse(localStorage.getItem('disp_legend') || '{}');
-  const missingColor  = stored.missingColor  || '#FFD600';
-  const completeColor = stored.completeColor || 'rgba(34,197,94,0.18)';
-
-  const el = document.createElement('div');
-  el.id = 'legend-editor';
-  el.className = 'legend-editor-panel';
-  el.innerHTML = `
-    <div class="legend-editor-title">Modifica colori legenda</div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Da trovare</label>
-        <input type="color" id="le-missing"  value="${missingColor.startsWith('#') ? missingColor : '#FFD600'}" />
-        <input type="range" id="le-missing-a" min="0" max="100"
-          value="${Math.round(getAlpha(missingColor)*100)}" />
-      </div>
-      <div class="form-group">
-        <label>Completo</label>
-        <input type="color" id="le-complete"  value="#22c55e" />
-        <input type="range" id="le-complete-a" min="0" max="100"
-          value="${Math.round(getAlpha(completeColor)*100)}" />
-      </div>
-    </div>
-    <button class="btn-primary btn-sm" onclick="applyLegendColors()">Applica</button>`;
-
-  document.getElementById('grid-legend').after(el);
-}
-
-function getAlpha(color) {
-  const m = color.match(/rgba?\([^)]+,\s*([\d.]+)\)/);
-  return m ? parseFloat(m[1]) : 1;
-}
-
-function hexToRgba(hex, alpha) {
-  const r = parseInt(hex.slice(1,3),16);
-  const g = parseInt(hex.slice(3,5),16);
-  const b = parseInt(hex.slice(5,7),16);
-  return alpha >= 0.99 ? hex : `rgba(${r},${g},${b},${alpha.toFixed(2)})`;
-}
-
-function applyLegendColors() {
-  const mc = document.getElementById('le-missing').value;
-  const ma = +document.getElementById('le-missing-a').value / 100;
-  const cc = document.getElementById('le-complete').value;
-  const ca = +document.getElementById('le-complete-a').value / 100;
-
-  const missingColor  = hexToRgba(mc, ma);
-  const completeColor = hexToRgba(cc, ca);
-
-  localStorage.setItem('disp_legend', JSON.stringify({ missingColor, completeColor }));
-
-  // Inject into CSS vars
-  document.documentElement.style.setProperty('--cell-missing',  missingColor);
-  document.documentElement.style.setProperty('--cell-complete', completeColor);
-  document.getElementById('swatch-missing').style.background  = missingColor;
-  document.getElementById('swatch-complete').style.background = completeColor;
-
-  document.getElementById('legend-editor')?.remove();
-  renderRicercaGrid(); // re-render with new colors
-}
-
-// On init, apply stored colors
-function applyStoredLegendColors() {
-  const stored = JSON.parse(localStorage.getItem('disp_legend') || '{}');
-  if (stored.missingColor)
-    document.documentElement.style.setProperty('--cell-missing', stored.missingColor);
-  if (stored.completeColor)
-    document.documentElement.style.setProperty('--cell-complete', stored.completeColor);
-}
-
-/* ================================================================
-   SECTION / TABLE BUILDERS
-================================================================ */
-const ROLE_ORDER = [
-  'autista','soccorritore','infermiere','medico','coordinatore',
-  'volontario_generico','opem','tlc','logista','sep','droni'
-];
-
-function buildTypeSection(type, resourceDays, byRD) {
-  const reqs = DISP.requirements[type] || [];
-
-  // One column per required role (respecting count > 1)
-  const displayRoles = reqs
-  .flatMap(r => Array.from({ length: r.count }, () => r.role))
-  .sort((a, b) => ROLE_ORDER.indexOf(a) - ROLE_ORDER.indexOf(b));
-
-  const requiredRoles = new Set(reqs.map(r => r.role));
-
-  let totalHoles = 0;
-  resourceDays.forEach(rd => {
-    const crew = byRD[rd.resource_day_id] || [];
-    displayRoles.forEach(role => {
-      if (!crew.find(p => p.role === role && p.status !== 'cancelled' && p.status !== 'no_show'))
-        totalHoles++;
-    });
-  });
-
-  const holesByRole = {};
-  displayRoles.forEach(role => {
-    const missing = resourceDays.filter(rd => {
-      const crew    = byRD[rd.resource_day_id] || [];
-      const rdStart = rd.rd_start || rd.start_time;
-      const rdEnd   = rd.rd_end   || rd.end_time;
-      const active  = crew.filter(p => p.role === role && p.status !== 'cancelled' && p.status !== 'no_show');
-      return !isRoleFullyCovered(active, rdStart, rdEnd);
-    }).length;
-    holesByRole[role] = missing;
-  });
-
-  const roleHeaders = displayRoles.map(r => {
-    const n = holesByRole[r];
-    return `<th class="col-role th-required">
-      ${ROLE_LABELS[r] || r}
-      ${n > 0 ? `<div class="col-hole-badge">mancano ${n}</div>` : ''}
-    </th>`;
-  }).join('');
-
-
-  const rows = resourceDays.map(rd =>
-    buildResourceRow(rd, byRD[rd.resource_day_id] || [], displayRoles, requiredRoles)
-  ).join('');
-
-  return `
-    <div class="disp-section">
-      <div class="section-header">
-        <span class="section-type-badge">${type}</span>
-        <span class="section-count">${resourceDays.length} risorse</span>
-      </div>
-      <div class="table-scroll-wrapper">
-        <table class="disp-table">
-          <thead><tr>
-            <th class="col-resource">Risorsa</th>
-            <th class="col-time">Orario</th>
-            <th class="col-luogo">Luogo</th>
-            <th class="col-note">Note</th>
-            <th class="col-mezzo">Mezzo</th>
-            ${roleHeaders}
-            <th class="col-add">Extra</th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-    </div>`;
-}
-
-
-function buildResourceRow(rd, crew, displayRoles, requiredRoles) {
-  const rdStart = rd.rd_start || rd.start_time;
-  const rdEnd   = rd.rd_end   || rd.end_time;
-  const orario  = (rdStart && rdEnd)
-    ? `${fmtTime(rdStart)}–${fmtTime(rdEnd)}`
-    : '—';
-
-  const roleCells = displayRoles.map(role => {
-    const people  = crew.filter(p => p.role === role)
-      .sort((a, b) => toMinutes(parseTime(a.scheduled_start)) - toMinutes(parseTime(b.scheduled_start)));
-    const isReq   = requiredRoles.has(role);
-    const active     = people.filter(p => p.status !== 'cancelled' && p.status !== 'no_show');
-    const isMissing  = isReq && !isRoleFullyCovered(active, rdStart, rdEnd);
-    const isComplete = isReq && !isMissing && active.length > 0;
-
-  return `<td class="person-cell${isMissing ? ' cell-missing' : isComplete ? ' cell-complete' : ''}">
-      ${buildRoleStack(people, role, rd.resource_day_id, rdStart, rdEnd)}
-    </td>`;
-  }).join('');
-
-  // Extra people not in any display role
-  const extras = crew.filter(p => !displayRoles.includes(p.role));
-
-  return `
-    <tr>
-      <td class="col-resource">
-        <div class="resource-name">${rd.resource}</div>
-        ${rd.targa ? `<div class="resource-targa">${rd.targa}</div>` : ''}
-      </td>
-      <td class="col-time" style="white-space:nowrap;font-family:var(--mono)">${orario}</td>
-      <td class="col-luogo">—</td>
-      <td class="col-note">—</td>
-      <td class="col-mezzo">—</td>
-      ${roleCells}
-      <td class="col-add">
-        <div class="person-stack">
-          ${extras.map(p => buildPersonCard(p)).join('')}
-          <button class="btn-add-extra"
-            onclick="openAssignmentFlow('${rd.resource_day_id}',null,null,null)"
-            title="Aggiungi personale">＋</button>
-        </div>
-      </td>
-    </tr>`;
-}
-
-/* ================================================================
-   TIME SLOT STACK
-   Builds a vertical stack of person-cards for a role cell.
-   Shows covered slots and one uncovered slot if applicable.
-================================================================ */
-function buildRoleStack(people, role, resourceDayId, rdStart, rdEnd) {
-  let html = '<div class="person-stack">';
-
-  if (!people.length) {
-    html += buildAddButton(resourceDayId, role,
-      rdStart ? fmtTimeParts(rdStart) : null,
-      rdEnd   ? fmtTimeParts(rdEnd)   : null);
-  } else {
-    buildTimeOrderedItems(people, rdStart, rdEnd).forEach(item => {
-      if (item.type === 'person') html += buildPersonCard(item.p);
-      else html += buildAddButton(resourceDayId, role, item.start, item.end, item.isGap);
-    });
-  }
-
-  html += '</div>';
-  return html;
-}
-
-function buildTimeOrderedItems(people, rdStart, rdEnd) {
-  if (!rdStart || !rdEnd) return people.map(p => ({ type: 'person', p }));
-
-  const winS = toMinutes(fmtTimeParts(rdStart));
-  const winE = toMinutes(fmtTimeParts(rdEnd));
-
-  const timed   = people
-    .filter(p => p.scheduled_start && p.scheduled_end)
-    .sort((a, b) => toMinutes(parseTime(a.scheduled_start)) - toMinutes(parseTime(b.scheduled_start)));
-  const untimed = people.filter(p => !p.scheduled_start || !p.scheduled_end);
-
-  if (!timed.length) {
-    // No time info — show full window gap then people
-    return [
-      { type: 'gap', start: fmtTimeParts(rdStart), end: fmtTimeParts(rdEnd), isGap: true },
-      ...untimed.map(p => ({ type: 'person', p })),
-    ];
-  }
-
-  const items = [];
-  let cursor = winS;
-
-  for (const p of timed) {
-    const pS = toMinutes(parseTime(p.scheduled_start));
-    const pE = toMinutes(parseTime(p.scheduled_end));
-    if (pS > cursor) items.push({ type: 'gap', start: fromMinutes(cursor), end: fromMinutes(pS), isGap: true });
-    items.push({ type: 'person', p });
-    cursor = Math.max(cursor, pE);
-  }
-
-  if (cursor < winE) items.push({ type: 'gap', start: fromMinutes(cursor), end: fromMinutes(winE), isGap: true });
-  untimed.forEach(p => items.push({ type: 'person', p }));
-
-  return items;
-}
-
-function isRoleFullyCovered(people, rdStart, rdEnd) {
-  if (!people.length) return false;
-  if (!rdStart || !rdEnd) return true; // no window defined → covered if anyone present
-
-  const winS = toMinutes(fmtTimeParts(rdStart));
-  const winE = toMinutes(fmtTimeParts(rdEnd));
-
-  const intervals = people
-    .filter(p => p.scheduled_start && p.scheduled_end)
-    .map(p => ({ s: toMinutes(parseTime(p.scheduled_start)), e: toMinutes(parseTime(p.scheduled_end)) }))
-    .filter(i => !isNaN(i.s) && !isNaN(i.e))
-    .sort((a, b) => a.s - b.s);
-
-  if (!intervals.length) return true; // people assigned but no times → treat as covered
-
-  let cursor = winS;
-  for (const i of intervals) {
-    if (i.s > cursor) return false; // gap
-    cursor = Math.max(cursor, i.e);
-  }
-  return cursor >= winE;
-}
-
-/*
-  Compute the first uncovered time range.
-  People are sorted by scheduled_start.
-  Returns { start: 'HH:MM', end: 'HH:MM' } or null if fully covered.
-*/
-function getUncoveredSlot(people, rdStart, rdEnd) {
-  if (!rdStart || !rdEnd) return null;
-
-  const windowStart = toMinutes(fmtTimeParts(rdStart));
-  const windowEnd   = toMinutes(fmtTimeParts(rdEnd));
-
-  if (isNaN(windowStart) || isNaN(windowEnd)) return null;
-
-  // Build covered intervals
-  const intervals = people
-    .filter(p => p.scheduled_start && p.scheduled_end)
-    .map(p => ({
-      s: toMinutes(parseTime(p.scheduled_start)),
-      e: toMinutes(parseTime(p.scheduled_end)),
-    }))
-    .filter(i => !isNaN(i.s) && !isNaN(i.e))
-    .sort((a, b) => a.s - b.s);
-
-  if (!intervals.length) {
-    // Nobody has explicit times — treat as fully covering (no sub-slot needed)
-    return null;
-  }
-
-  // Find first gap starting from windowStart
-  let cursor = windowStart;
-  for (const interval of intervals) {
-    if (interval.s > cursor) {
-      // Gap before this interval
-      return { start: fromMinutes(cursor), end: fromMinutes(interval.s) };
-    }
-    cursor = Math.max(cursor, interval.e);
-  }
-
-  // Gap at end
-  if (cursor < windowEnd) {
-    return { start: fromMinutes(cursor), end: fromMinutes(windowEnd) };
-  }
-
-  return null; // fully covered
-}
-
-function buildAddButton(resourceDayId, role, startHint, endHint, isGap = false) {
-  const timeLabel = (startHint && endHint) ? `${startHint}–${endHint}` : '';
-  return `
-    <div class="person-card person-empty${isGap ? ' person-empty-gap' : ''}"
-      onclick="openAssignmentFlow('${resourceDayId}','${role||''}','${startHint||''}','${endHint||''}')">
-      <span class="empty-plus">+</span>
-      ${role ? `<span class="empty-role">${ROLE_LABELS[role]||role}</span>` : ''}
-      ${timeLabel ? `<span class="empty-time">${timeLabel}</span>` : ''}
-    </div>`;
-}
-
-function getExtraPersonnel(crew, requiredSlots) {
-  const rem = [...crew];
-  requiredSlots.forEach(role => { const i = rem.findIndex(p => p.role===role); if (i>=0) rem.splice(i,1); });
-  return rem;
-}
-
-/* ================================================================
-   PERSON CARD
-================================================================ */
-function buildPersonCard(p) {
-  const ana    = p.anagrafica || {};
-  const status = p.status || 'scheduled';
-  const startT = parseTime(p.scheduled_start);
-  const endT   = parseTime(p.scheduled_end);
-
-  return `
-    <div class="person-card" data-status="${status}"
-      style="background:${STATUS_COLORS[status]};border-left:3px solid ${COMP_COLORS[p.competenza_attivazione || ana.competenza_attivazione] || 'transparent'};"
-      onclick="openPersonDetailModal('${p.id}')">
-      <div class="person-name">${ana.surname || ''}${ana.name ? ' ' + ana.name : ''}</div>
-      <div class="person-line">${ROLE_LABELS[p.role] || p.role || '—'}</div>
-      ${displayComitato(ana.comitato) ? `<div class="person-line">${displayComitato(ana.comitato)}</div>` : ''}
-      ${(startT && endT) ? `<div class="person-line person-time">${startT}–${endT}</div>` : ''}
-      ${p.updated_by ? `<div class="person-editor">✎ ${p.updated_by === DISP.user?.id ? 'Tu' : p.updated_by.slice(0,8)+'…'}</div>` : ''}
-    </div>`;
-}
-
-/* ================================================================
-   TWO-STEP ASSIGNMENT FLOW
-
-   openAssignmentFlow(resourceDayId, role, startHint, endHint)
-     → shows search modal (for new) OR goes to step 1 directly
-
-   For existing personnel → openPersonDetailModal(personnelId)
-     → also uses the two-step modal in edit mode
-================================================================ */
-
-/* Entry point: empty cell clicked */
 function openAssignmentFlow(resourceDayId, role, startHint, endHint) {
   CTX.anagraficaId  = null;
   CTX.personnelId   = null;
@@ -780,7 +250,6 @@ function openAssignmentFlow(resourceDayId, role, startHint, endHint) {
   openSearchModal();
 }
 
-/* Search modal */
 function openSearchModal() {
   document.getElementById('search-surname').value = '';
   document.getElementById('search-name').value    = '';
@@ -822,6 +291,12 @@ function openSearchModal() {
   setTimeout(() => document.getElementById('search-surname').focus(), 80);
 }
 
+function selectFromSearch(anagraficaId) {
+  CTX.anagraficaId = anagraficaId;
+  closeModal('modal-search');
+  openStep1(anagraficaId);
+}
+
 function renderSearchResults(container, results) {
   if (!results.length) { container.innerHTML = '<div class="search-empty">Nessun risultato</div>'; return; }
   container.innerHTML = results.map(a => {
@@ -836,13 +311,7 @@ function renderSearchResults(container, results) {
   }).join('');
 }
 
-function selectFromSearch(anagraficaId) {
-  CTX.anagraficaId = anagraficaId;
-  closeModal('modal-search');
-  openStep1(anagraficaId);
-}
-
-/* ── STEP 1: Person info ───────────────────────────────────────*/
+/* ── STEP 1: ───────────────────────────────────────*/
 async function openStep1(anagraficaId) {
   let prefill = {};
   if (anagraficaId) {
@@ -984,7 +453,7 @@ async function handleStep1Next() {
   openStep2();
 }
 
-/* ── STEP 2: Assignment details ────────────────────────────────*/
+/* ── STEP 2: ────────────────────────────────*/
 function openStep2() {
   CTX.step = 2;
  
@@ -1025,7 +494,6 @@ function openStep2() {
   wireStep2();
 }
  
-
 function renderStep2Form(existing, turni, rdStart, rdEnd) {
   const e      = existing || {};
   const ana    = e.anagrafica || CTX.anaData || {};
@@ -1208,7 +676,6 @@ function setPartenza(val) {
   }
 }
 
-/* Collect step 2 values */
 function collectStep2() {
   const mandataCom = document.querySelector('#comunicazione-block')?.style.display !== 'none';
   const mandataAtt = document.querySelector('#attivazione-block')?.style.display !== 'none';
@@ -1300,7 +767,6 @@ async function handleConfirm() {
   }
 }
 
-/* Open modal for existing personnel → two-step edit */
 async function openPersonDetailModal(personnelId) {
   CTX.personnelId = personnelId;
   const p = DISP.personnel.find(p => p.id === personnelId);
@@ -1331,406 +797,6 @@ async function cancelPersonnel(personnelId) {
     if (DISP._currentPage === 'ricerca') renderRicercaGrid();
     else if (DISP._currentPage === 'attivazioni') renderAttivazioniBody();
   } catch (err) { showToast(err.message, 'error'); }
-}
-
-/* ================================================================
-   VIEW: ATTIVAZIONI
-================================================================ */
-async function mountAttivazioni(container) {
-  container.innerHTML = `
-    <div class="view-header">
-      <div class="view-header-left">
-        <h2 class="view-title">Attivazioni</h2>
-        <select id="att-session" class="session-select"></select>
-      </div>
-      <div class="view-header-right">
-        <div class="competenza-filter" id="att-comp-filter">
-          <button class="comp-btn active" data-comp="">Tutti</button>
-          <button class="comp-btn" data-comp="SOP">SOP</button>
-          <button class="comp-btn" data-comp="Sala_Roma">Sala Roma</button>
-          <button class="comp-btn" data-comp="SOR">SOR</button>
-        </div>
-      </div>
-    </div>
-    <div id="att-body" class="view-body"></div>`;
-
-  const sel = document.getElementById('att-session');
-  sel.innerHTML = DISP.sessions.map(s =>
-    `<option value="${s.session}" ${s.session===DISP.session?'selected':''}>${s.label}</option>`
-  ).join('');
-
-  sel.addEventListener('change', async () => { DISP.session = +sel.value; await loadSessionData(); renderAttivazioniBody(); });
-  document.querySelectorAll('#att-comp-filter .comp-btn').forEach(btn =>
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#att-comp-filter .comp-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active'); DISP.competenzaFilter = btn.dataset.comp || null;
-      renderAttivazioniBody();
-    })
-  );
-
-  if (!DISP.personnel.length) await loadSessionData();
-  renderAttivazioniBody();
-}
-
-function renderAttivazioniBody() {
-  const body = document.getElementById('att-body');
-  if (!body) return;
-
-  const filtered = (DISP.competenzaFilter
-      ? DISP.personnel.filter(p => p.anagrafica?.competenza_attivazione === DISP.competenzaFilter)
-      : DISP.personnel
-    ).filter(p => p.status !== 'cancelled');
-
-  if (!filtered.length) {
-    body.innerHTML = '<div class="empty-state">Nessun personale per questa sessione.</div>';
-    return;
-  }
-
-  const groups = {};
-  filtered.forEach(p => {
-    const comp = p.anagrafica?.competenza_attivazione || '—';
-    if (!groups[comp]) groups[comp] = [];
-    groups[comp].push(p);
-  });
-
-  const ORDER = ['SOP','Sala_Roma','SOR'];
-  const sorted = [...ORDER.filter(c=>groups[c]), ...Object.keys(groups).filter(c=>!ORDER.includes(c))];
-
-  body.innerHTML = sorted.map(comp => {
-    const people = groups[comp];
-    const activated = people.filter(p => p.status==='activated').length;
-    const color = COMP_COLORS[comp] || 'var(--text-muted)';
-
-    const rows = people.map(p => {
-      const ana = p.anagrafica || {};
-      const rd  = DISP.resourceDays.find(r => r.resource_day_id === p.resource_day_id);
-      const startT = parseTime(p.scheduled_start);
-      const endT   = parseTime(p.scheduled_end);
-      return `
-        <tr class="att-row att-row-${p.status}">
-          <td><input type="checkbox" class="att-check" data-id="${p.id}" /></td>
-          <td class="att-name" onclick="openPersonDetailModal('${p.id}')" style="cursor:pointer">${ana.surname||''} ${ana.name||''}</td>
-          <td class="att-role">${ROLE_LABELS[p.role]||p.role||'—'}</td>
-          <td class="att-resource">${rd?.resource||'—'}</td>
-          <td class="att-time">${startT&&endT?`${startT}–${endT}`:'—'}</td>
-          <td class="att-comitato">${ana.comitato||'—'}</td>
-          <td class="att-phone">${ana.number?`<a href="tel:${ana.number}">${ana.number}</a>`:'—'}</td>
-          <td>
-            <div class="att-status-btns">
-              ${['scheduled','activated','cancelled'].map(s => `
-                <button class="att-status-btn att-${s} ${p.status===s?'active':''}"
-                  onclick="quickSetStatus('${p.id}','${s}')"
-                  title="${STATUS_LABELS[s]}">
-                  ${s==='scheduled'?'○':s==='activated'?'✓':'✕'}
-                </button>`).join('')}
-            </div>
-          </td>
-        </tr>`;
-    }).join('');
-
-    return `
-      <div class="att-section">
-        <div class="att-section-header">
-          <span class="att-comp-badge" style="border-color:${color};color:${color};">${comp}</span>
-          <span class="att-count">${activated} / ${people.length} attivati</span>
-          <div class="att-bulk-btns">
-            <button class="btn-sm btn-secondary" onclick="bulkActivate('${comp}')">Attiva sel.</button>
-            <button class="btn-sm btn-secondary" onclick="bulkCancel('${comp}')">Annulla sel.</button>
-            <button class="btn-sm btn-secondary" onclick="selectAllComp('${comp}')">Sel. tutti</button>
-          </div>
-        </div>
-        <div class="table-scroll-wrapper">
-          <table class="att-table">
-            <thead><tr>
-              <th style="width:32px"></th><th>Nominativo</th><th>Ruolo</th>
-              <th>Risorsa</th><th>Orario</th><th>Comitato</th><th>Telefono</th><th>Stato</th>
-            </tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-      </div>`;
-  }).join('');
-}
-
-async function quickSetStatus(personnelId, status) {
-  try {
-    await updatePersonnelFields(personnelId, { status });
-    const p = DISP.personnel.find(p => p.id===personnelId);
-    if (p) p.status = status;
-    renderAttivazioniBody();
-  } catch (err) { showToast(err.message, 'error'); }
-}
-
-async function bulkActivate(comp) {
-  const ids = getCheckedIds(comp);
-  if (!ids.length) { showToast('Nessuno selezionato', 'error'); return; }
-  try {
-    await bulkUpdatePersonnelStatus(ids, 'activated');
-    ids.forEach(id => { const p = DISP.personnel.find(p=>p.id===id); if (p) p.status='activated'; });
-    renderAttivazioniBody(); showToast(`${ids.length} attivati ✓`, 'success');
-  } catch (err) { showToast(err.message, 'error'); }
-}
-
-async function bulkCancel(comp) {
-  const ids = getCheckedIds(comp);
-  if (!ids.length) { showToast('Nessuno selezionato', 'error'); return; }
-  try {
-    await bulkUpdatePersonnelStatus(ids, 'cancelled');
-    ids.forEach(id => { const p = DISP.personnel.find(p=>p.id===id); if (p) p.status='cancelled'; });
-    renderAttivazioniBody(); showToast(`${ids.length} annullati`, 'success');
-  } catch (err) { showToast(err.message, 'error'); }
-}
-
-function selectAllComp(comp) {
-  document.querySelectorAll('.att-check').forEach(cb => {
-    const section = cb.closest('.att-section');
-    const badge   = section?.querySelector('.att-comp-badge');
-    if (badge?.textContent.trim() === comp) cb.checked = true;
-  });
-}
-
-function getCheckedIds(comp) {
-  const ids = [];
-  document.querySelectorAll('.att-check:checked').forEach(cb => {
-    const section = cb.closest('.att-section');
-    const badge   = section?.querySelector('.att-comp-badge');
-    if (!comp || badge?.textContent.trim() === comp) ids.push(cb.dataset.id);
-  });
-  return ids;
-}
-
-/* ================================================================
-   VIEW: IMPOSTAZIONI
-================================================================ */
-async function mountImpostazioni(container) {
-  container.innerHTML = `
-    <div class="view-header">
-      <div class="view-header-left"><h2 class="view-title">Impostazioni</h2></div>
-      <div class="view-header-right">
-        <div class="tab-bar" id="imp-tabs">
-          <button class="tab-btn active" data-tab="matrix">Risorse al giorno</button>
-          <button class="tab-btn"        data-tab="requirements">Requisiti</button>
-        </div>
-      </div>
-    </div>
-    <div id="imp-body" class="view-body"></div>`;
-
-  document.querySelectorAll('#imp-tabs .tab-btn').forEach(btn =>
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#imp-tabs .tab-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      if (btn.dataset.tab==='matrix') renderMatrix();
-      else renderRequirements();
-    })
-  );
-
-  DISP.allResourceDays = await fetchAllResourceDays(DISP.eventId);
-  renderMatrix();
-}
-
-function renderMatrix() {
-  const body = document.getElementById('imp-body');
-  if (!body) return;
-
-  const sessions  = DISP.sessions;
-  const resources = DISP.allResources;
-  const existing  = new Set(DISP.allResourceDays.map(rd => `${rd.resource_id}::${rd.session}`));
-
-  const sessionHeaders = sessions.map(s => `<th class="matrix-session-th" title="${s.label}">G${s.session}</th>`).join('');
-
-  const rows = resources.map(r => {
-    const cells = sessions.map(s => {
-      const key    = `${r.id}::${s.session}`;
-      const exists = existing.has(key);
-      const rdRow  = DISP.allResourceDays.find(rd => rd.resource_id===r.id && rd.session===s.session);
-      return `
-        <td class="matrix-cell ${exists?'cell-on':'cell-off'}"
-          onclick="toggleResourceDay('${r.id}','${s.session}','${s.date}',${exists},'${rdRow?.id||''}')"
-          title="${s.label}">
-          ${exists?'✓':''}
-        </td>`;
-    }).join('');
-    return `<tr>
-      <td class="matrix-resource-name">
-        <span class="matrix-type-badge">${r.resource_type}</span>${r.resource}
-      </td>${cells}
-    </tr>`;
-  }).join('');
-
-  body.innerHTML = `
-    <div class="matrix-toolbar">
-      <button class="btn-primary" onclick="openBulkCreateModal()">+ Aggiungi in blocco</button>
-      <span style="font-size:11px;color:var(--text-muted)">Clicca cella per aggiungere/rimuovere</span>
-    </div>
-    <div class="table-scroll-wrapper">
-      <table class="matrix-table">
-        <thead><tr><th class="matrix-resource-th">Risorsa</th>${sessionHeaders}</tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-    ${buildBulkCreatePanel()}`;
-
-  wireBulkCreatePanel();
-}
-
-async function toggleResourceDay(resourceId, session, date, exists, rdId) {
-  try {
-    if (exists && rdId) {
-      await deleteResourceDay(rdId);
-      DISP.allResourceDays = DISP.allResourceDays.filter(rd => rd.id !== rdId);
-    } else {
-      const newRd = await createResourceDay(DISP.eventId, resourceId, +session, date, null, null);
-      DISP.allResourceDays.push(newRd);
-    }
-    renderMatrix();
-  } catch (err) { showToast(err.message, 'error'); }
-}
-
-function buildBulkCreatePanel() {
-  return `
-    <div class="bulk-panel" id="bulk-panel" style="display:none">
-      <div class="bulk-panel-title">Aggiungi in blocco</div>
-      <div class="form-row">
-        <div class="form-group"><label>Dalla sessione</label>
-          <select id="bulk-from">${DISP.sessions.map(s=>`<option value="${s.session}">G${s.session} — ${s.label}</option>`).join('')}</select></div>
-        <div class="form-group"><label>Alla sessione</label>
-          <select id="bulk-to">${DISP.sessions.map((s,i)=>`<option value="${s.session}" ${i===DISP.sessions.length-1?'selected':''}>G${s.session} — ${s.label}</option>`).join('')}</select></div>
-        <div class="form-group"><label>Inizio</label><input type="time" id="bulk-start" value="07:00" /></div>
-        <div class="form-group"><label>Fine</label><input type="time" id="bulk-end" value="22:00" /></div>
-      </div>
-      <div class="form-group">
-        <label>Tipo risorsa</label>
-        <div class="type-filter-btns" id="bulk-type-filter">
-          <button class="type-btn active" data-type="">Tutti</button>
-          ${[...new Set(DISP.allResources.map(r=>r.resource_type))].sort().map(t=>`<button class="type-btn" data-type="${t}">${t}</button>`).join('')}
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Risorse</label>
-        <div class="bulk-resource-list" id="bulk-resource-list"></div>
-      </div>
-      <div id="bulk-error" class="error-msg"></div>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <button class="btn-primary" id="btn-bulk-confirm">Crea giorni</button>
-        <button class="btn-secondary" onclick="document.getElementById('bulk-panel').style.display='none'">Annulla</button>
-      </div>
-    </div>`;
-}
-
-function openBulkCreateModal() {
-  const panel = document.getElementById('bulk-panel');
-  if (panel) { panel.style.display=''; populateBulkResourceList(''); }
-}
-
-function wireBulkCreatePanel() {
-  document.querySelectorAll('#bulk-type-filter .type-btn').forEach(btn =>
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#bulk-type-filter .type-btn').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active'); populateBulkResourceList(btn.dataset.type);
-    })
-  );
-  document.getElementById('btn-bulk-confirm')?.addEventListener('click', confirmBulkCreate);
-}
-
-function populateBulkResourceList(typeFilter) {
-  const list = document.getElementById('bulk-resource-list');
-  if (!list) return;
-  const filtered = typeFilter ? DISP.allResources.filter(r=>r.resource_type===typeFilter) : DISP.allResources;
-  list.innerHTML = filtered.map(r => `
-    <label class="bulk-resource-item">
-      <input type="checkbox" value="${r.id}" />
-      <span class="matrix-type-badge">${r.resource_type}</span>${r.resource}
-    </label>`).join('');
-}
-
-async function confirmBulkCreate() {
-  const from = +document.getElementById('bulk-from').value;
-  const to   = +document.getElementById('bulk-to').value;
-  const s    = document.getElementById('bulk-start').value || null;
-  const e    = document.getElementById('bulk-end').value   || null;
-  const errEl = document.getElementById('bulk-error');
-  errEl.textContent = '';
-
-  const resourceIds = [...document.querySelectorAll('#bulk-resource-list input:checked')].map(cb=>cb.value);
-  if (!resourceIds.length) { errEl.textContent = 'Seleziona almeno una risorsa.'; return; }
-  if (from > to)           { errEl.textContent = 'Sessione fine ≥ inizio.'; return; }
-
-  const sessions = DISP.sessions.filter(s => s.session>=from && s.session<=to);
-  const btn = document.getElementById('btn-bulk-confirm');
-  btn.disabled = true; btn.textContent = 'Creazione...';
-  try {
-    const result = await bulkCreateResourceDays(DISP.eventId, resourceIds, sessions, s, e);
-    document.getElementById('bulk-panel').style.display = 'none';
-    DISP.allResourceDays = await fetchAllResourceDays(DISP.eventId);
-    renderMatrix();
-    showToast(`${result.created} giorni creati ✓`, 'success');
-  } catch (err) { errEl.textContent = err.message; }
-  finally { btn.disabled=false; btn.textContent='Crea giorni'; }
-}
-
-async function renderRequirements() {
-  const body = document.getElementById('imp-body');
-  if (!body) return;
-  const reqs = await fetchRequirements();
-  const allTypes = [...new Set(DISP.allResources.map(r=>r.resource_type))].sort();
-
-  const sections = allTypes.map(type => {
-    const typeReqs = reqs[type] || [];
-    const rows = typeReqs.map(r => `
-      <tr>
-        <td>${ROLE_LABELS[r.role]||r.role}</td>
-        <td><input type="number" class="req-count-input" min="0" max="10"
-          value="${r.count}" data-id="${r.id}" style="width:60px;text-align:center" /></td>
-        <td><button class="btn-icon-sm" onclick="deleteReq('${r.id}')">✕</button></td>
-      </tr>`).join('');
-
-    const roleOpts = ALL_ROLES
-      .filter(role => !typeReqs.find(r=>r.role===role))
-      .map(role => `<option value="${role}">${ROLE_LABELS[role]}</option>`).join('');
-
-    return `
-      <div class="req-section">
-        <div class="req-section-title">${type}</div>
-        <table class="req-table">
-          <thead><tr><th>Ruolo</th><th>Quantità</th><th></th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-        ${roleOpts ? `
-          <div class="req-add-row">
-            <select id="req-role-${type}" class="req-role-select">
-              <option value="">+ Aggiungi ruolo...</option>${roleOpts}
-            </select>
-            <button class="btn-secondary btn-sm" onclick="addRequirement('${type}')">Aggiungi</button>
-          </div>` : ''}
-      </div>`;
-  }).join('');
-
-  body.innerHTML = `<div class="req-body">${sections}</div>`;
-
-  document.querySelectorAll('.req-count-input').forEach(input => {
-    let t;
-    input.addEventListener('input', () => {
-      clearTimeout(t);
-      t = setTimeout(async () => {
-        if (+input.value < 0) return;
-        try { await upsertRequirement(input.dataset.id, null, null, +input.value); showToast('Salvato ✓','success'); }
-        catch (err) { showToast(err.message,'error'); }
-      }, 600);
-    });
-  });
-}
-
-async function addRequirement(resourceType) {
-  const sel = document.getElementById(`req-role-${resourceType}`);
-  if (!sel?.value) return;
-  try { await upsertRequirement(null, resourceType, sel.value, 1); showToast('Aggiunto ✓','success'); await renderRequirements(); }
-  catch (err) { showToast(err.message,'error'); }
-}
-
-async function deleteReq(id) {
-  if (!confirm('Rimuovere?')) return;
-  try { await deleteRequirement(id); showToast('Rimosso','success'); await renderRequirements(); }
-  catch (err) { showToast(err.message,'error'); }
 }
 
 /* ================================================================
@@ -1935,7 +1001,7 @@ async function exportXLSX() {
 }
 
 /* ================================================================
-   TURNI HELPER
+   TURNI & TIME UTILITIES
 ================================================================ */
 function computeTurni(rdStart, rdEnd) {
   if (!rdStart || !rdEnd) return null;
@@ -1953,11 +1019,6 @@ function computeTurni(rdStart, rdEnd) {
   ];
 }
 
-/* ================================================================
-   TIME UTILITIES
-================================================================ */
-
-/* Extract HH:MM from an ISO datetime or a TIME string */
 function parseTime(val) {
   if (!val) return null;
   try {
@@ -1970,25 +1031,21 @@ function parseTime(val) {
   } catch { return null; }
 }
 
-/* Normalize a TIME column value (08:00:00) to HH:MM */
 function fmtTimeParts(t) {
   if (!t) return null;
   return t.slice(0, 5);
 }
 
-/* Convert HH:MM to total minutes */
 function toMinutes(hhmm) {
   if (!hhmm) return NaN;
   const [h, m] = hhmm.split(':').map(Number);
   return h * 60 + m;
 }
 
-/* Convert total minutes to HH:MM */
 function fromMinutes(min) {
   return `${String(Math.floor(min/60)).padStart(2,'0')}:${String(min%60).padStart(2,'0')}`;
 }
 
-/* Build an ISO datetime from a resource_day date + HH:MM time */
 function buildDateTime(resourceDayId, timeStr) {
   if (!timeStr) return null;
   const rd = DISP.resourceDays.find(r => r.resource_day_id === resourceDayId);
@@ -1996,7 +1053,6 @@ function buildDateTime(resourceDayId, timeStr) {
   return new Date(`${date}T${timeStr}:00`).toISOString();
 }
 
-/* Convert ISO to datetime-local input value (YYYY-MM-DDTHH:MM) */
 function toLocalInput(iso) {
   if (!iso) return '';
   try { return new Date(iso).toISOString().slice(0, 16); } catch { return ''; }
@@ -2005,6 +1061,29 @@ function toLocalInput(iso) {
 function fmtTime(t) {
   if (!t) return '—';
   return fmtTimeParts(t) || '—';
+}
+
+/* ================================================================
+   LEGEND COLOR PERSISTENCE
+================================================================ */
+function applyStoredLegendColors() {
+  const stored = JSON.parse(localStorage.getItem('disp_legend') || '{}');
+  if (stored.missingColor)
+    document.documentElement.style.setProperty('--cell-missing', stored.missingColor);
+  if (stored.completeColor)
+    document.documentElement.style.setProperty('--cell-complete', stored.completeColor);
+}
+
+function getAlpha(color) {
+  const m = color.match(/rgba?\([^)]+,\s*([\d.]+)\)/);
+  return m ? parseFloat(m[1]) : 1;
+}
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return alpha >= 0.99 ? hex : `rgba(${r},${g},${b},${alpha.toFixed(2)})`;
 }
 
 /* ================================================================
@@ -2025,3 +1104,16 @@ function showToast(msg, type='success') {
 }
 
 document.addEventListener('DOMContentLoaded', initDispositivo);
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -20,6 +20,7 @@ async function signInWithGoogle() {
   });
   if (error) throw error;
 }
+
 async function signOut() { await db.auth.signOut(); }
 
 /* ── Events ────────────────────────────────────────────────────*/
@@ -56,6 +57,45 @@ async function fetchSessionsForEvent(eventId) {
   }
   return sessions;
 }
+
+async function fetchPersonnelForSessions(eventId, sessions) {
+  // sessions = array of session numbers e.g. [1, 2, 3]
+  if (!sessions.length) return [];
+ 
+  const { data, error } = await db
+    .from('personnel')
+    .select(`
+      id, role, status, notes,
+      scheduled_start, scheduled_end,
+      mandata_comunicazione, time_comunicazione, notes_comunicazione,
+      competenza_attivazione,
+      mandata_attivazione, activation_protocol,
+      time_activation_protocol, notes_activation_protocol,
+      partenza,
+      updated_at, updated_by, resource_day_id,
+      anagrafica(
+        id, name, surname, cf, comitato, number, email,
+        qualifications, competenza_attivazione,
+        ice, allergies
+      ),
+      resource_days!inner(id, session, resource_id,
+        resources!resource_days_resource_id_fkey(id, resource, resource_type)
+      )
+    `)
+    .eq('event_id', eventId)
+    .in('resource_days.session', sessions);
+ 
+  if (error) throw error;
+ 
+  // Flatten: attach session + resource name directly for easy access in the view
+  return (data || []).map(p => ({
+    ...p,
+    _session:  p.resource_days?.session,
+    _resource: p.resource_days?.resources?.resource,
+    _resource_type: p.resource_days?.resources?.resource_type,
+  }));
+}
+
 
 /* ── Resource Days ─────────────────────────────────────────────*/
 async function fetchResourceDaysForSession(eventId, session) {

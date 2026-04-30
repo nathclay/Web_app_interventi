@@ -271,65 +271,32 @@ async function initPCAMap(event) {
 }
 
 function addGridAxisLabels(cells, map) {
-  const TOLERANCE = 0.0001;
+  if (PCA.gridLabels) {
+    PCA.map.removeLayer(PCA.gridLabels);
+    PCA.gridLabels = null;
+  }
+  const s = GEO_STYLES.grid;
+  if (!s.labelsVisible) return;
 
-  // Compute centroid for each cell
-  const cellData = cells.map(row => {
+  PCA.gridLabels = L.layerGroup().addTo(map);
+
+  cells.forEach(row => {
     const geom = typeof row.geom === 'string' ? JSON.parse(row.geom) : row.geom;
     if (geom.crs) delete geom.crs;
     const b = L.geoJSON({ type: 'Feature', geometry: geom }).getBounds();
-    return {
-      lat: (b.getNorth() + b.getSouth()) / 2,
-      lng: (b.getEast()  + b.getWest())  / 2,
-      north: b.getNorth(),
-      west:  b.getWest(),
-    };
-  });
 
-  // Unique columns by longitude, sorted west→east → A, B, C...
-  const uniqueLngs = [...new Set(
-    cellData.map(c => Math.round(c.lng / TOLERANCE) * TOLERANCE)
-  )].sort((a, b) => b - a);
-
-  // Unique rows by latitude, sorted north→south → 1, 2, 3...
-  const uniqueLats = [...new Set(
-    cellData.map(c => Math.round(c.lat / TOLERANCE) * TOLERANCE)
-  )].sort((a, b) => a - b);
-
-  const gridNorth = Math.max(...cellData.map(c => c.north));
-  const gridWest  = Math.min(...cellData.map(c => c.west));
-
-  const labelStyle = `
-    font-size:11px;font-weight:700;color:var(--text-secondary, #888);
-    font-family:system-ui,sans-serif;white-space:nowrap;`;
-
-  // Letters along the top
-  uniqueLngs.forEach((lng, i) => {
-    const letter = String.fromCharCode(65 + i); // A=65
-    L.marker([gridNorth, lng], {
+    L.marker([b.getNorth(), b.getEast()], {
       icon: L.divIcon({
         className: '',
-        html: `<div style="${labelStyle}">${letter}</div>`,
-        iconSize:   [20, 16],
-        iconAnchor: [10, -4],  // sits just above the top edge
+        html: `<div style="font-size:${s.labelSize}px;font-weight:700;
+          color:${s.labelColor};font-family:system-ui,sans-serif;
+          white-space:nowrap;opacity:0.8;">${row.label || '—'}</div>`,
+        iconSize: [28, 14],
+        iconAnchor: [28, 0],
       }),
       interactive: false,
       zIndexOffset: -200,
-    }).addTo(map);
-  });
-
-  // Numbers along the left
-  uniqueLats.forEach((lat, i) => {
-    L.marker([lat, gridWest], {
-      icon: L.divIcon({
-        className: '',
-        html: `<div style="${labelStyle}">${i + 1}</div>`,
-        iconSize:   [20, 16],
-        iconAnchor: [24, 8],   // sits just left of the west edge
-      }),
-      interactive: false,
-      zIndexOffset: -200,
-    }).addTo(map);
+    }).addTo(PCA.gridLabels);
   });
 }
 
@@ -458,9 +425,11 @@ function toggleGeoLayer(key, btn) {
   if (!layer || !PCA.map) return;
   if (PCA.map.hasLayer(layer)) {
     PCA.map.removeLayer(layer);
+    if (key === 'grid' && PCA.gridLabels) PCA.map.removeLayer(PCA.gridLabels);
     btn.classList.remove('active');
   } else {
     PCA.map.addLayer(layer);
+    if (key === 'grid' && PCA.gridLabels) PCA.map.addLayer(PCA.gridLabels);
     btn.classList.add('active');
   }
 }
@@ -571,7 +540,8 @@ function focusMapSearch() {
 ================================================================ */
 const GEO_STYLES = {
   route:   { color: '#f0883e', weight: 3,    opacity: 0.8, fillOpacity: 0 },
-  grid:    { color: '#58a6ff', weight: 1.5,  opacity: 0.7, fillOpacity: 0.08 },
+  grid:    { color: '#58a6ff', weight: 1.5,  opacity: 0.7, fillOpacity: 0.08,
+            labelColor: '#000000', labelSize: 9, labelsVisible: true },
   fixed:   { color: '#bc8cff', radius: 6,  opacity: 1, markerType: 'dot' },
   markers: { color: '#ffffff', radius: 4,  opacity: 1, markerType: 'label' },
   poi:     { color: '#ffa657', radius: 6,  opacity: 1, markerType: 'dot' },
@@ -633,8 +603,32 @@ function openGeoStyleModal(key, label) {
       <input type="range" id="gs-fill-opacity" min="0" max="1" step="0.05" value="${s.fillOpacity}"
         oninput="this.previousElementSibling.textContent='Opacità riempimento ('+Math.round(this.value*100)+'%)'"
         style="width:100%;" />
-    </div>` : ''}`;
-
+      </div>
+      <div class="form-group">
+        <label>Etichette celle</label>
+        <div style="display:flex;gap:6px;">
+          <button type="button" class="pca-yn-btn ${s.labelsVisible ? 'active-yes' : ''}"
+            onclick="this.closest('.form-group').querySelectorAll('.pca-yn-btn').forEach(b=>b.classList.remove('active-yes'));this.classList.add('active-yes');document.getElementById('gs-labels-visible').value='true'">
+            Visibili
+          </button>
+          <button type="button" class="pca-yn-btn ${!s.labelsVisible ? 'active-yes' : ''}"
+            onclick="this.closest('.form-group').querySelectorAll('.pca-yn-btn').forEach(b=>b.classList.remove('active-yes'));this.classList.add('active-yes');document.getElementById('gs-labels-visible').value='false'">
+            Nascoste
+          </button>
+        </div>
+        <input type="hidden" id="gs-labels-visible" value="${s.labelsVisible}" />
+      </div>
+      <div class="form-group">
+        <label>Colore etichette</label>
+        <input type="color" id="gs-label-color" value="${s.labelColor}"
+          style="width:100%;height:36px;border:none;background:none;cursor:pointer;" />
+      </div>
+      <div class="form-group">
+        <label>Dimensione etichette (${s.labelSize}px)</label>
+        <input type="range" id="gs-label-size" min="7" max="16" step="1" value="${s.labelSize}"
+          oninput="this.previousElementSibling.textContent='Dimensione etichette ('+this.value+'px)'"
+          style="width:100%;" />
+      </div>` : ''}`;
   document.getElementById('geo-style-save').onclick = () => applyGeoStyle(key);
   openModal('modal-geo-style');
 }
@@ -647,6 +641,12 @@ function applyGeoStyle(key) {
   const o = document.getElementById('gs-opacity');
   const f = document.getElementById('gs-fill-opacity');
   const mt = document.getElementById('gs-marker-type');
+  const lc = document.getElementById('gs-label-color');
+  const ls = document.getElementById('gs-label-size');
+  const lv = document.getElementById('gs-labels-visible');
+  if (lc) s.labelColor    = lc.value;
+  if (ls) s.labelSize     = parseInt(ls.value);
+  if (lv) s.labelsVisible = lv.value === 'true';
   if (mt) s.markerType = mt.value;
   if (w) s.weight      = parseFloat(w.value);
   if (r) s.radius      = parseFloat(r.value);
@@ -674,7 +674,9 @@ function applyGeoStyle(key) {
   // Update color indicator on button
   const btn = document.querySelector(`[data-geo="${key}"]`);
   if (btn) btn.style.borderLeftColor = s.color;
-
+  if (key === 'grid' && _geoLayerData['grid']) {
+    addGridAxisLabels(_geoLayerData['grid'], PCA.map);
+  }
   closeModal('modal-geo-style');
 }
 

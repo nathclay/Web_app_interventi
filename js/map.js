@@ -8,6 +8,9 @@
 
 let miniMapInstance      = null;
 let mapInstance = null;
+let gridLayerGroup = null;
+let gridLabelsLayer = null;
+let poiLayerGroup  = null;
 const mapMarkers    = {};  // resource_id -> L.marker
 
 /* ----------------------------------------------------------------
@@ -410,82 +413,86 @@ async function loadEventGeoLayers() {
       .select('geom, label')
       .eq('event_id', STATE.resource.event_id);
 
+    gridLayerGroup = L.layerGroup();
     (data || []).forEach(row => {
       if (!row.geom) return;
       const geom = typeof row.geom === 'string' ? JSON.parse(row.geom) : row.geom;
       if (geom.crs) delete geom.crs;
-
-      const layer = L.geoJSON({ type: 'Feature', geometry: geom, properties: {} }, {
+      L.geoJSON({ type: 'Feature', geometry: geom, properties: {} }, {
         style: { color: '#58a6ff', weight: 1.5, opacity: 0.7, fillOpacity: 0.08, fillColor: '#58a6ff' },
       }).bindPopup(`<strong>${row.label || '—'}</strong>`)
-        .addTo(mapInstance);
-
+        .addTo(gridLayerGroup);
     });
+    gridLayerGroup.addTo(mapInstance);
+    if (data?.length) addGridAxisLabels(data, mapInstance);
+  }
 
-    if (data?.length) addGridAxisLabels(data, mapInstance);  
+  const { data: pois } = await db
+    .from('event_poi')
+    .select('geom, label')
+    .eq('event_id', STATE.resource.event_id);
+
+  if (pois?.length) {
+    poiLayerGroup = L.layerGroup();
+    pois.forEach(row => {
+      if (!row.geom?.coordinates) return;
+      const [lng, lat] = row.geom.coordinates;
+      L.circleMarker([lat, lng], {
+        radius: 6, color: '#ffa657', fillColor: '#ffa657', fillOpacity: 0.9, weight: 2,
+      }).bindPopup(`<strong>${row.label || '—'}</strong>`)
+        .addTo(poiLayerGroup);
+    });
+    poiLayerGroup.addTo(mapInstance);
+  }
+
+}
+
+function toggleGridLayer() {
+  if (!gridLayerGroup || !mapInstance) return;
+  const btn = document.getElementById('btn-toggle-grid');
+  if (mapInstance.hasLayer(gridLayerGroup)) {
+    mapInstance.removeLayer(gridLayerGroup);
+    if (gridLabelsLayer) mapInstance.removeLayer(gridLabelsLayer);
+    if (btn) btn.classList.remove('active');
+  } else {
+    mapInstance.addLayer(gridLayerGroup);
+    if (gridLabelsLayer) mapInstance.addLayer(gridLabelsLayer);
+    if (btn) btn.classList.add('active');
+  }
+}
+
+function togglePoiLayer() {
+  if (!poiLayerGroup || !mapInstance) return;
+  const btn = document.getElementById('btn-toggle-poi');
+  if (mapInstance.hasLayer(poiLayerGroup)) {
+    mapInstance.removeLayer(poiLayerGroup);
+    if (btn) btn.classList.remove('active');
+  } else {
+    mapInstance.addLayer(poiLayerGroup);
+    if (btn) btn.classList.add('active');
   }
 }
 
 function addGridAxisLabels(cells, map) {
-  const TOLERANCE = 0.0001;
+  gridLabelsLayer = L.layerGroup().addTo(map);
 
-  // Compute centroid for each cell
-  const cellData = cells.map(row => {
+  cells.forEach(row => {
     const geom = typeof row.geom === 'string' ? JSON.parse(row.geom) : row.geom;
     if (geom.crs) delete geom.crs;
     const b = L.geoJSON({ type: 'Feature', geometry: geom }).getBounds();
-    return {
-      lat: (b.getNorth() + b.getSouth()) / 2,
-      lng: (b.getEast()  + b.getWest())  / 2,
-      north: b.getNorth(),
-      west:  b.getWest(),
-    };
-  });
 
-  // Unique columns by longitude, sorted west→east → A, B, C...
-  const uniqueLngs = [...new Set(
-    cellData.map(c => Math.round(c.lng / TOLERANCE) * TOLERANCE)
-  )].sort((a, b) => b - a);
-
-  // Unique rows by latitude, sorted north→south → 1, 2, 3...
-  const uniqueLats = [...new Set(
-    cellData.map(c => Math.round(c.lat / TOLERANCE) * TOLERANCE)
-  )].sort((a, b) => a - b);
-
-  const gridNorth = Math.max(...cellData.map(c => c.north));
-  const gridWest  = Math.min(...cellData.map(c => c.west));
-
-  const labelStyle = `
-    font-size:11px;font-weight:700;color:var(--text-secondary, #888);
-    font-family:system-ui,sans-serif;white-space:nowrap;`;
-
-  // Letters along the top
-  uniqueLngs.forEach((lng, i) => {
-    const letter = String.fromCharCode(65 + i); // A=65
-    L.marker([gridNorth, lng], {
+    L.marker([b.getNorth(), b.getEast()], {
       icon: L.divIcon({
         className: '',
-        html: `<div style="${labelStyle}">${letter}</div>`,
-        iconSize:   [20, 16],
-        iconAnchor: [10, -4],  // sits just above the top edge
+        html: `<div style="font-size:9px;font-weight:700;color:#000000;
+          font-family:system-ui,sans-serif;white-space:nowrap;
+          opacity:0.8;">${row.label || '—'}</div>`,
+        iconSize: [28, 14],
+        iconAnchor: [28, 0],
       }),
       interactive: false,
       zIndexOffset: -200,
-    }).addTo(map);
-  });
-
-  // Numbers along the left
-  uniqueLats.forEach((lat, i) => {
-    L.marker([lat, gridWest], {
-      icon: L.divIcon({
-        className: '',
-        html: `<div style="${labelStyle}">${i + 1}</div>`,
-        iconSize:   [20, 16],
-        iconAnchor: [24, 8],   // sits just left of the west edge
-      }),
-      interactive: false,
-      zIndexOffset: -200,
-    }).addTo(map);
+    }).addTo(gridLabelsLayer);
   });
 }
 
@@ -514,17 +521,17 @@ async function initCercaPanel() {
       gridSelect.innerHTML = '<option value="">— Seleziona zona —</option>' +
         cells.map(c => `<option value="${c.id}">${c.label}</option>`).join('');
 
-      gridSelect.addEventListener('change', () => {
-        const cell = cells.find(c => c.id === gridSelect.value);
-        if (!cell) return;
-        clearCercaLayers();
-        const geom = typeof cell.geom === 'string' ? JSON.parse(cell.geom) : cell.geom;
-        if (geom.crs) delete geom.crs;
-        _cercaGridLayer = L.geoJSON({ type:'Feature', geometry: geom }, {
-          style: { color: '#1e7fff', weight: 3, opacity: 1, fillOpacity: 0.2, fillColor: '#1e7fff' }
-        }).addTo(mapInstance);
-        mapInstance.fitBounds(_cercaGridLayer.getBounds(), { padding: [20, 20] });
-      });
+    gridSelect.addEventListener('change', () => {
+      const cell = cells.find(c => c.id === gridSelect.value);
+      if (!cell) return;
+      clearCercaLayers();
+      const geom = typeof cell.geom === 'string' ? JSON.parse(cell.geom) : cell.geom;
+      if (geom.crs) delete geom.crs;
+      _cercaGridLayer = L.geoJSON({ type:'Feature', geometry: geom }, {
+        style: { color: '#ffd700', weight: 3, opacity: 1, fillOpacity: 0.25, fillColor: '#ffd700' }  // ← yellow
+      }).addTo(mapInstance);
+      mapInstance.fitBounds(_cercaGridLayer.getBounds(), { padding: [20, 20] });
+    });
     }
   }
 
