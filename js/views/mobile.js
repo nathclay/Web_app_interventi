@@ -5,7 +5,7 @@
    Depends on: rpc.js, ui.js, state.js, realtime.js, location.js,
                map.js, incidents.js
 ================================================================ */
-
+const SHOW_INTERVENTI = false;
 /* ----------------------------------------------------------------
    RESOURCE TYPE LABELS
 ---------------------------------------------------------------- */
@@ -100,6 +100,11 @@ async function loadMobileView() {
 
   // Wire up incident form events
   initIncidentForm();
+
+  if (!SHOW_INTERVENTI) {
+    document.querySelector('.tab-btn[data-tab="panel-interventi"]').style.display = 'none';
+    document.getElementById('panel-interventi').style.display = 'none';
+  }
 
   // Show the main view
   showScreen('screen-main');

@@ -102,7 +102,8 @@ async function fetchResourceDaysForSession(eventId, session) {
   const { data, error } = await db
     .from('resource_days')
     .select(`
-      id, session, date, notes, start_time, end_time,
+      id, session, date, notes, start_time, end_time, geom, location_description,
+      vehicle:vehicle_id(id, licence_plate, vehicle_type, marca, modello),
       resources!inner(
         id, resource, resource_type, targa, notes,
         start_time, end_time, user_email,
@@ -116,7 +117,7 @@ async function fetchResourceDaysForSession(eventId, session) {
   if (error) throw error;
   return (data || []).map(rd => ({
     resource_day_id: rd.id, session: rd.session, date: rd.date,
-    rd_notes: rd.notes, rd_start: rd.start_time, rd_end: rd.end_time,
+    rd_notes: rd.notes, rd_start: rd.start_time, rd_end: rd.end_time, vehicle: rd.vehicle,
     ...rd.resources,
   }));
 }

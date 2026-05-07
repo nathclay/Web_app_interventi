@@ -63,6 +63,9 @@ CREATE TABLE resource_days (
   start_time TIMESTAMPTZ,
   end_time TIMESTAMPTZ,
   notes       TEXT,
+  geom GEOMETRY(POINT, 4326), -- location of the resource on that day, as per the health plan. Can be updated during the event based on GPS tracking, but this is the default location for planning purposes.
+  location_description TEXT, -- free text description of the location (e.g. "Gate 3, near the big oak tree")
+  vehicle_id UUID REFERENCES vehicles(id) ON DELETE SET NULL, -- optional reference to a vehicle assigned to that resource on that day
   created_at  TIMESTAMPTZ DEFAULT now(),
   created_by  UUID REFERENCES auth.users(id),
   updated_by  UUID REFERENCES auth.users(id),
@@ -121,7 +124,6 @@ CREATE TABLE resources (
   event_id uuid REFERENCES events(id) NOT NULL,
   resource TEXT NOT NULL,
   resource_type type_enum NOT NULL,
-  targa TEXT,
   geom GEOMETRY(POINT, 4326), --initial position of resource, as per the health plan
   start_time TIMESTAMPTZ, --from timetable
   end_time TIMESTAMPTZ,
@@ -134,6 +136,17 @@ CREATE TABLE resources (
   notes TEXT
 );
 ALTER TABLE resources ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE vehicles (
+  id           UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  licence_plate        TEXT NOT NULL UNIQUE,
+  vehicle_type         TEXT,           
+  marca TEXT,
+  modello TEXT,
+  notes        TEXT,
+  created_at   TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE vehicles ENABLE ROW LEVEL SECURITY;
 
 
 --location_history table: Time-series GPS position history for all assets. Every position update is appended here, 

@@ -248,11 +248,23 @@ function buildRecapBar(resourceDays, byRD) {
    SECTION & ROW BUILDERS
 ================================================================ */
 const ROLE_ORDER = [
-  'autista','soccorritore','infermiere','medico','coordinatore',
-  'volontario_generico','opem','tlc','logista','sep','droni'
+  'autista','soccorritore','sep','infermiere','medico','coordinatore',
+  'volontario_generico','opem','tlc','logista','droni'
 ];
 
+const TYPE_COLUMNS = {
+  ASM:  ['orario', 'luogo', 'note', 'mezzo'],
+  ASI:  ['orario', 'luogo', 'note', 'mezzo'],
+  PMA:  ['orario', 'luogo', 'note'],
+  SAP:  ['orario', 'luogo', 'note'],
+  BICI: ['orario', 'luogo', 'note'],
+  LDC:  ['orario', 'luogo', 'note'],
+};
+const DEFAULT_COLUMNS = ['orario', 'luogo', 'note'];
+
 function buildTypeSection(type, resourceDays, byRD) {
+  
+  const cols = TYPE_COLUMNS[type] || DEFAULT_COLUMNS;
   const reqs = DISP.requirements[type] || [];
 
   // One column per required role (respecting count > 1)
@@ -283,6 +295,14 @@ function buildTypeSection(type, resourceDays, byRD) {
     holesByRole[role] = missing;
   });
 
+  const fixedHeaders = [
+    `<th class="col-resource">Risorsa</th>`,
+    cols.includes('orario') ? `<th class="col-time">Orario</th>`  : '',
+    cols.includes('luogo')  ? `<th class="col-luogo">Luogo</th>`  : '',
+    cols.includes('note')   ? `<th class="col-note">Note</th>`    : '',
+    cols.includes('mezzo')  ? `<th class="col-mezzo">Mezzo</th>`  : '',
+  ].join('');
+
   const roleHeaders = displayRoles.map(r => {
     const n = holesByRole[r];
     return `<th class="col-role th-required">
@@ -293,7 +313,7 @@ function buildTypeSection(type, resourceDays, byRD) {
 
 
   const rows = resourceDays.map(rd =>
-    buildResourceRow(rd, byRD[rd.resource_day_id] || [], displayRoles, requiredRoles)
+    buildResourceRow(rd, byRD[rd.resource_day_id] || [], displayRoles, requiredRoles, cols)
   ).join('');
 
   return `
@@ -305,11 +325,7 @@ function buildTypeSection(type, resourceDays, byRD) {
       <div class="table-scroll-wrapper">
         <table class="disp-table">
           <thead><tr>
-            <th class="col-resource">Risorsa</th>
-            <th class="col-time">Orario</th>
-            <th class="col-luogo">Luogo</th>
-            <th class="col-note">Note</th>
-            <th class="col-mezzo">Mezzo</th>
+            ${fixedHeaders}
             ${roleHeaders}
             <th class="col-add">Extra</th>
           </tr></thead>
@@ -319,12 +335,25 @@ function buildTypeSection(type, resourceDays, byRD) {
     </div>`;
 }
 
-function buildResourceRow(rd, crew, displayRoles, requiredRoles) {
+function buildResourceRow(rd, crew, displayRoles, requiredRoles, cols = DEFAULT_COLUMNS) {
   const rdStart = rd.rd_start || rd.start_time;
   const rdEnd   = rd.rd_end   || rd.end_time;
+  const mezzo   = rd.vehicle?.licence_plate || rd.vehicle?.marca || rd.vehicle?.modello || '—';
+
   const orario  = (rdStart && rdEnd)
     ? `${fmtTime(rdStart)}–${fmtTime(rdEnd)}`
     : '—';
+
+  const fixedCells = [
+    `<td class="col-resource">
+      <div class="resource-name">${rd.resource}</div>
+      ${rd.targa ? `<div class="resource-targa">${rd.targa}</div>` : ''}
+    </td>`,
+    cols.includes('orario') ? `<td class="col-time" style="white-space:nowrap;font-family:var(--font-mono)">${rdStart && rdEnd ? `${fmtTime(rdStart)}–${fmtTime(rdEnd)}` : '—'}</td>` : '',
+    cols.includes('luogo')  ? `<td class="col-luogo">${rd.location_description || '—'}</td>` : '',
+    cols.includes('note')   ? `<td class="col-note">${rd.rd_notes || '—'}</td>`              : '',
+    cols.includes('mezzo')  ? `<td class="col-mezzo">${mezzo}</td>`                           : '',
+  ].join('');  
 
   const roleCells = displayRoles.map(role => {
     const people  = crew.filter(p => p.role === role)
@@ -344,14 +373,7 @@ function buildResourceRow(rd, crew, displayRoles, requiredRoles) {
 
   return `
     <tr>
-      <td class="col-resource">
-        <div class="resource-name">${rd.resource}</div>
-        ${rd.targa ? `<div class="resource-targa">${rd.targa}</div>` : ''}
-      </td>
-      <td class="col-time" style="white-space:nowrap;font-family:var(--mono)">${orario}</td>
-      <td class="col-luogo">—</td>
-      <td class="col-note">—</td>
-      <td class="col-mezzo">—</td>
+      ${fixedCells}
       ${roleCells}
       <td class="col-add">
         <div class="person-stack">
